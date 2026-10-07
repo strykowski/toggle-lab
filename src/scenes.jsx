@@ -33,6 +33,7 @@ const I = {
   navbar: <><rect x="1.5" y="2.5" width="13" height="11" rx="2" /><path d="M1.5 6h13M4 4.3h.01M6 4.3h.01" /></>,
   home: <><path d="M2.5 7.5L8 3l5.5 4.5V13.5h-11z" /><path d="M6.5 13.5v-3.5h3v3.5" /></>,
   cockpit: <><circle cx="8" cy="8" r="5.5" /><path d="M8 2.5v2M8 11.5v2M2.5 8h2M11.5 8h2" /><circle cx="8" cy="8" r="1" /></>,
+  docs: <><path d="M4 1.8h5.2L12 4.6v9.6H4z" /><path d="M9 1.8v3h3M6.2 8h3.6M6.2 10.6h3.6" /></>,
 };
 export const SceneIcon = ({ id }) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -49,6 +50,8 @@ export const SCENES = [
   { value: "navbar", label: "Navbar", Comp: Navbar, dark: false },
   { value: "home", label: "Smart home", Comp: SmartHome, dark: true },
   { value: "cockpit", label: "Cockpit", Comp: Cockpit, dark: true },
+  // Rendered by App: a generated spec sheet rather than a live scene.
+  { value: "docs", label: "Documentation", divider: true },
 ];
 
 // ---------- Settings (mobile) ----------

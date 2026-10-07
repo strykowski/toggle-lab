@@ -5,25 +5,33 @@ const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 let uid = 0;
 
 // Render the switch in one state as a standalone SVG string.
-export function switchSvg(v, checked = true) {
+// `frame` draws in-between states for the docs: progress (thumb position, 0 = off, 1 = on,
+// may overshoot), fill (on-color opacity 0..1) and stretch (pressed thumb width factor).
+export function switchSvg(v, checked = true, frame = {}) {
   const { Track: T, Thumb: H, Icon: I, Label: L, Depth: D, Effects: E } = v;
   const id = `s${++uid}`;
   const W = T.width, HT = T.height, pad = T.padding, S = H.size;
-  const size = checked ? S : Math.max(4, S * H.offScale);
-  const c = checked ? W - pad - S / 2 : pad + S / 2;
+  const p = frame.progress ?? (checked ? 1 : 0);
+  const f = Math.max(0, Math.min(1, frame.fill ?? (checked ? 1 : 0)));
+  const on = f >= 0.5; // which label, icon and border state to show
+  const sOff = Math.max(4, S * H.offScale);
+  const size = sOff + (S - sOff) * Math.max(0, Math.min(1, p));
+  const tw = size * (frame.stretch ?? 1);
+  const offC = pad + S / 2, onC = W - pad - S / 2;
+  // A pressed thumb stretches toward the middle, anchored at its resting side.
+  const c = offC + (onC - offC) * p + (p >= 0.5 ? -(tw - size) / 2 : (tw - size) / 2);
   const rT = (T.roundness * Math.min(W, HT)) / 2;
   const rTh = (H.roundness * size) / 2;
   const sh = H.shadow;
-  const glow = checked ? E.glow : 0;
+  const glow = E.glow * f;
 
-  // Bleed so shadows, glow and overhanging thumbs aren't cropped.
-  const overhang = Math.max(0, size / 2 - HT / 2, -pad);
+  // Bleed so shadows, glow, overhanging and overshooting thumbs aren't cropped.
+  const overshoot = Math.max(0, (p - 1) * (onC - offC), -p * (onC - offC));
+  const overhang = Math.max(0, size / 2 - HT / 2, -pad) + overshoot;
   const depthBleed = D.opacity > 0 ? D.blur * 1.5 + Math.max(Math.abs(D.offsetX), Math.abs(D.offsetY)) : 0;
   const M = Math.ceil(Math.max(4, glow * 1.2, depthBleed, overhang + (sh > 0 ? 3 + 10 * sh : 2)));
   const VW = W + M * 2, VH = HT + M * 2;
   const tx = M, ty = M;
-  const trackFill = checked ? T.onColor : T.offColor;
-  const thumbFill = checked ? H.onColor : H.offColor;
   const trackRect = (extra = "") => `<rect x="${tx}" y="${ty}" width="${W}" height="${HT}" rx="${r(rT)}" ${extra}/>`;
 
   const defs = [];
@@ -44,13 +52,13 @@ export function switchSvg(v, checked = true) {
   defs.push(`<clipPath id="${id}-clip">${trackRect()}</clipPath>`);
   const body = [];
   body.push(trackRect(`fill="${T.offColor}"`));
-  if (checked) {
-    if (T.fillMode === "grow") body.push(`<rect x="${tx}" y="${ty}" width="${r(Math.max(0, c + size / 2))}" height="${HT}" rx="${r(rT)}" fill="${T.onColor}"/>`);
-    else body.push(trackRect(`fill="${T.onColor}"`));
-  }
-  if (E.finish === "plasma" && checked) {
+  if (T.fillMode === "grow") {
+    const o = Math.min(1, Math.max(0, p / 0.12));
+    if (o > 0) body.push(`<rect x="${tx}" y="${ty}" width="${r(Math.max(0, c + size / 2))}" height="${HT}" rx="${r(rT)}" fill="${T.onColor}"${o < 1 ? ` opacity="${r(o)}"` : ""}/>`);
+  } else if (f > 0) body.push(trackRect(`fill="${T.onColor}"${f < 1 ? ` opacity="${r(f)}"` : ""}`));
+  if (E.finish === "plasma" && f > 0) {
     defs.push(`<linearGradient id="${id}-plasma" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#ff006e"/><stop offset=".3" stop-color="#fb5607"/><stop offset=".55" stop-color="#ffbe0b"/><stop offset=".8" stop-color="#3a86ff"/><stop offset="1" stop-color="#8338ec"/></linearGradient>`);
-    body.push(trackRect(`fill="url(#${id}-plasma)" opacity="0.92"`));
+    body.push(trackRect(`fill="url(#${id}-plasma)" opacity="${r(0.92 * f)}"`));
   }
   if (E.finish === "holographic") {
     defs.push(holoGrad(`${id}-holo`));
@@ -70,8 +78,8 @@ export function switchSvg(v, checked = true) {
   }
   if (L.show) {
     const font = L.font === "mono" ? "Geist Mono, ui-monospace, Menlo, monospace" : "Geist, system-ui, -apple-system, Segoe UI, sans-serif";
-    const lx = checked ? (pad + (W - pad - S / 2) - S / 2) / 2 : (pad + S + W - pad) / 2;
-    body.push(`<text x="${r(tx + lx)}" y="${r(ty + HT / 2)}" text-anchor="middle" dominant-baseline="central" font-family="${font}" font-weight="600" font-size="${L.size}" letter-spacing="${r(L.size * 0.02)}" fill="${checked ? L.onColor : L.offColor}">${esc(checked ? L.onText : L.offText)}</text>`);
+    const lx = on ? (pad + (W - pad - S / 2) - S / 2) / 2 : (pad + S + W - pad) / 2;
+    body.push(`<text x="${r(tx + lx)}" y="${r(ty + HT / 2)}" text-anchor="middle" dominant-baseline="central" font-family="${font}" font-weight="600" font-size="${L.size}" letter-spacing="${r(L.size * 0.02)}" fill="${on ? L.onColor : L.offColor}">${esc(on ? L.onText : L.offText)}</text>`);
   }
   if (T.inset > 0) {
     const i = T.inset;
@@ -80,15 +88,15 @@ export function switchSvg(v, checked = true) {
     body.push(trackRect(`fill="#000" filter="url(#${id}-in1)"`));
     body.push(trackRect(`fill="#000" filter="url(#${id}-in2)"`));
   }
-  if (T.borderWidth > 0 && !(T.borderOffOnly && checked)) {
+  if (T.borderWidth > 0 && !(T.borderOffOnly && on)) {
     const b = T.borderWidth;
     body.push(`<rect x="${tx + b / 2}" y="${ty + b / 2}" width="${W - b}" height="${HT - b}" rx="${r(Math.max(0, rT - b / 2))}" fill="none" stroke="${T.borderColor}" stroke-width="${b}"/>`);
   }
   layers.push(`<g clip-path="url(#${id}-clip)">${body.join("")}</g>`);
 
   // Thumb
-  const thx = tx + c - size / 2, thy = ty + HT / 2 - size / 2;
-  const thumbRect = (extra) => `<rect x="${r(thx)}" y="${r(thy)}" width="${r(size)}" height="${r(size)}" rx="${r(rTh)}" ${extra}/>`;
+  const thx = tx + c - tw / 2, thy = ty + HT / 2 - size / 2;
+  const thumbRect = (extra) => `<rect x="${r(thx)}" y="${r(thy)}" width="${r(tw)}" height="${r(size)}" rx="${r(rTh)}" ${extra}/>`;
   if (sh > 0) {
     defs.push(`<filter id="${id}-ts" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="${r(0.5 + 3 * sh)}" stdDeviation="${r((1 + 8 * sh) / 2)}" flood-color="#000" flood-opacity="${r(0.06 + 0.24 * sh)}"/></filter>`);
   }
@@ -96,7 +104,8 @@ export function switchSvg(v, checked = true) {
     defs.push(`<filter id="${id}-tg" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="${r(glow / 4)}"/></filter>`);
     layers.push(thumbRect(`fill="${E.color}" opacity=".8" filter="url(#${id}-tg)"`));
   }
-  layers.push(thumbRect(`fill="${thumbFill}"${sh > 0 ? ` filter="url(#${id}-ts)"` : ""}`));
+  layers.push(thumbRect(`fill="${f >= 1 ? H.onColor : H.offColor}"${sh > 0 ? ` filter="url(#${id}-ts)"` : ""}`));
+  if (f > 0 && f < 1) layers.push(thumbRect(`fill="${H.onColor}" opacity="${r(f)}"`));
   if (E.finish === "holographic") layers.push(thumbRect(`fill="url(#${id}-holo)" opacity=".45"`));
   if (E.finish === "chrome") layers.push(thumbRect(`fill="url(#${id}-chrome)" opacity=".55"`));
   if (H.gloss > 0) {
@@ -106,7 +115,7 @@ export function switchSvg(v, checked = true) {
   if (I.glyph !== "none" && GLYPHS[I.glyph]) {
     const ip = Math.max(6, S * I.size);
     const k = ip / 24;
-    layers.push(`<g color="${checked ? I.onColor : I.offColor}" transform="translate(${r(tx + c - ip / 2)} ${r(ty + HT / 2 - ip / 2)}) scale(${r(k * 1000) / 1000})">${GLYPHS[I.glyph][checked ? "on" : "off"]}</g>`);
+    layers.push(`<g color="${on ? I.onColor : I.offColor}" transform="translate(${r(tx + c - ip / 2)} ${r(ty + HT / 2 - ip / 2)}) scale(${r(k * 1000) / 1000})">${GLYPHS[I.glyph][on ? "on" : "off"]}</g>`);
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}" fill="none"><defs>${defs.join("")}</defs>${layers.join("")}</svg>`;

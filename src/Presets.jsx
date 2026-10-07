@@ -88,6 +88,9 @@ export function Listbox({ label, options, value, onChange, renderValue, renderOp
             const header = o.group && o.group !== lastGroup ? o.group : null;
             lastGroup = o.group;
             return [
+              o.divider && i > 0 && (
+                <li key={`d-${o.value}`} role="separator" className="select-divider" />
+              ),
               header && (
                 <li key={`g-${header}`} role="presentation" className="select-group">{header}</li>
               ),

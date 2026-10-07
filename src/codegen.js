@@ -158,8 +158,13 @@ ${finish === "plasma" ? `.switch[aria-checked="true"]::before { opacity: 0.92; }
     ${trackOn};
 }
 
-.switch:active {
+.switch:active:not(:disabled) {
   scale: ${r(M.pressScale)};
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .switch:focus-visible {
@@ -186,7 +191,7 @@ ${finish === "plasma" ? `.switch[aria-checked="true"]::before { opacity: 0.92; }
     background-color var(--fill-duration) var(--fill-ease);
 }
 
-.switch:active .switch-thumb {
+.switch:active:not(:disabled) .switch-thumb {
   width: ${px(stretchOff)};
 }
 
@@ -198,7 +203,7 @@ ${finish === "plasma" ? `.switch[aria-checked="true"]::before { opacity: 0.92; }
   background-color: ${H.onColor};
 }
 
-.switch[aria-checked="true"]:active .switch-thumb {
+.switch[aria-checked="true"]:active:not(:disabled) .switch-thumb {
   left: ${px(onLeftPressed)};
   width: ${px(stretchOn)};
 }
@@ -313,10 +318,11 @@ const CENTER_OFF = ${r(g.offC)};
 const CENTER_ON = ${r(g.onC)};
 const PRESS_STRETCH = ${r(H.pressStretch)};
 ${labelConst}${iconConst}
-export function Switch({ checked: controlled, defaultChecked = false, onCheckedChange, label = "Toggle"${I.glyph !== "none" ? ", onIcon, offIcon" : ""} }) {
+export function Switch({ checked: controlled, defaultChecked = false, onCheckedChange, disabled = false, label = "Toggle"${I.glyph !== "none" ? ", onIcon, offIcon" : ""} }) {
   const [uncontrolled, setUncontrolled] = useState(defaultChecked);
   const checked = controlled ?? uncontrolled;
   const [pressed, setPressed] = useState(false);
+  const [focusRing, setFocusRing] = useState(false);
 
   const size = checked ? SIZE_ON : SIZE_OFF;
   const width = pressed ? size * PRESS_STRETCH : size;
@@ -343,11 +349,14 @@ ${hasSquash ? `
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={toggle}
-      onPointerDown={() => setPressed(true)}
+      onPointerDown={() => !disabled && setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
-      whileTap={{ scale: ${r(M.pressScale)} }}
+      onFocus={(e) => setFocusRing(e.currentTarget.matches(":focus-visible"))}
+      onBlur={() => setFocusRing(false)}
+      whileTap={disabled ? undefined : { scale: ${r(M.pressScale)} }}
       style={{
         position: "relative",
         width: W,
@@ -358,7 +367,10 @@ ${hasSquash ? `
         background: "${T.offColor}",
         boxShadow: "${trackShadow}",
         overflow: "visible",
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        outline: focusRing ? "2px solid #006bff" : "none",
+        outlineOffset: 2,
       }}
     >
       <motion.span

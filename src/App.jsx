@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DialRoot, DialStore, useDialKitController } from "dialkit";
 import { useReducedMotion } from "motion/react";
 import { Toggle } from "./Toggle.jsx";
@@ -7,6 +7,19 @@ import { settleMs } from "./transitions.js";
 import { PresetsPanel, Listbox } from "./Presets.jsx";
 import { SCENES, SceneCtx, SceneIcon } from "./scenes.jsx";
 import { CodeDrawer } from "./CodeDrawer.jsx";
+
+// Loaded on first visit to the Documentation view.
+const Docs = lazy(() => import("./Docs.jsx").then((m) => ({ default: m.Docs })));
+const docsFallback = (
+  <div className="docs is-loading">
+    <div className="docs-loading" role="status">
+      <span className="docs-loader" aria-hidden="true"><span /></span>
+      <p className="docs-loading-title">Generating docs…</p>
+      <p className="docs-loading-step">Preparing</p>
+      <span className="docs-progress" aria-hidden="true"><span style={{ width: 0 }} /></span>
+    </div>
+  </div>
+);
 
 const BACKGROUNDS = [
   { id: "paper", label: "Paper" },
@@ -62,6 +75,7 @@ export default function App() {
   const [loop, setLoop] = useState(false);
   const [graph, setGraph] = useStored("graph", false);
   const [logoOn, setLogoOn] = useState(true);
+  const [docs, setDocs] = useState(null);
   const [codeOpen, setCodeOpen] = useState(false);
   const codeBtn = useRef(null);
   const reduceMotion = useReducedMotion();
@@ -126,6 +140,7 @@ export default function App() {
   const settle = settleMs(v.Motion.thumb, slow);
   const sceneDef = SCENES.find((s) => s.value === scene) ?? SCENES[0];
   const isCanvas = sceneDef.value === "canvas";
+  const isDocs = sceneDef.value === "docs";
   const darkSurface = isCanvas ? bg === "ink" : !!sceneDef.dark;
   const SceneComp = sceneDef.Comp;
   const ctx = { v, slow, zoom: isCanvas ? zoom : 1, checked, setChecked, trace };
@@ -176,7 +191,11 @@ export default function App() {
         <section className={`stage${darkSurface ? " is-dark" : ""}`} aria-label="Preview">
           <div className={`stage-scene${isCanvas ? ` stage-${bg}` : ""}`}>
             <SceneCtx.Provider value={ctx}>
-              {isCanvas ? (
+              {isDocs ? (
+                <Suspense fallback={docsFallback}>
+                  <Docs v={v} docs={docs} onDocs={setDocs} styleName={activeStyle?.name} />
+                </Suspense>
+              ) : isCanvas ? (
                 <div className="stage-canvas">
                   <div className="stage-zoom" style={{ transform: `scale(${zoom})` }}>
                     <Toggle v={v} checked={checked} onToggle={setChecked} slow={slow} zoom={zoom} trace={trace} />
@@ -224,14 +243,16 @@ export default function App() {
                   <Segmented label="Zoom" value={zoom} onChange={setZoom} options={ZOOMS.map((z) => ({ value: z, label: `${z}×` }))} />
                 </>
               )}
-              <Segmented
-                label="Speed"
-                value={slow}
-                onChange={setSlow}
-                options={SPEEDS.map((s) => ({ value: s.id, label: s.label, title: s.id === 1 ? "Real time" : `Slow motion ${s.label}` }))}
-              />
+              {!isDocs && (
+                <Segmented
+                  label="Speed"
+                  value={slow}
+                  onChange={setSlow}
+                  options={SPEEDS.map((s) => ({ value: s.id, label: s.label, title: s.id === 1 ? "Real time" : `Slow motion ${s.label}` }))}
+                />
+              )}
             </div>
-            <div className="toolbar-group">
+            {!isDocs && <div className="toolbar-group">
               <button type="button" className="chip" aria-pressed={graph} onClick={() => setGraph((g) => !g)}>
                 <span className="chip-dot" aria-hidden="true" />
                 Graph
@@ -240,17 +261,17 @@ export default function App() {
                 <span className="chip-dot" aria-hidden="true" />
                 Loop
               </button>
-            </div>
+            </div>}
           </div>
 
-          <div className="stage-footer">
+          {!isDocs && <div className="stage-footer">
             {graph && <Trace trace={trace} slow={slow} settle={settle} />}
             <p className="stage-hint">
               {reduceMotion
                 ? "Reduced motion is on, so trail, bursts, and squash are paused."
                 : "Click, drag, or press Space on the switch."}
             </p>
-          </div>
+          </div>}
         </section>
       </main>
 
