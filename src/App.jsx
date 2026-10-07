@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DialRoot, DialStore, useDialKitController } from "dialkit";
 import { useReducedMotion } from "motion/react";
 import { Toggle } from "./Toggle.jsx";
@@ -20,6 +20,29 @@ const docsFallback = (
     </div>
   </div>
 );
+
+// After a redeploy, an open tab may ask for a Docs chunk that no longer exists.
+// Offer a reload instead of letting the whole app go blank.
+class DocsBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="docs is-loading">
+        <div className="docs-loading" role="alert">
+          <p className="docs-loading-title">Couldn’t load the docs</p>
+          <p className="docs-loading-step">A new version of Toggle Lab is probably available.</p>
+          <button type="button" className="btn btn-primary btn-small" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
 
 const BACKGROUNDS = [
   { id: "paper", label: "Paper" },
@@ -192,9 +215,11 @@ export default function App() {
           <div className={`stage-scene${isCanvas ? ` stage-${bg}` : ""}`}>
             <SceneCtx.Provider value={ctx}>
               {isDocs ? (
-                <Suspense fallback={docsFallback}>
-                  <Docs v={v} docs={docs} onDocs={setDocs} styleName={activeStyle?.name} />
-                </Suspense>
+                <DocsBoundary>
+                  <Suspense fallback={docsFallback}>
+                    <Docs v={v} docs={docs} onDocs={setDocs} styleName={activeStyle?.name} />
+                  </Suspense>
+                </DocsBoundary>
               ) : isCanvas ? (
                 <div className="stage-canvas">
                   <div className="stage-zoom" style={{ transform: `scale(${zoom})` }}>

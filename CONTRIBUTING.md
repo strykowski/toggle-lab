@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Before opening a pull request, make sure `npm run build` passes. CI runs the same check.
+Before opening a pull request, make sure `npm run build` passes.
 
 ## Adding a style preset
 
