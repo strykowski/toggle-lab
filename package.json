@@ -1,0 +1,28 @@
+{
+  "name": "toggle-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A playground for designing switch/toggle components: shape, color, motion and effects, tuned live with DialKit.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "dialkit": "2.0.2",
+    "motion": "^14.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.3"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}
