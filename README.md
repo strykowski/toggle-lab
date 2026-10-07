@@ -4,7 +4,7 @@ A playground for designing switch components. Shape it, color it, tune its motio
 
 ![Toggle Lab: a lightsaber-style switch extending and retracting in slow motion](docs/demo.gif)
 
-**[Live demo →](https://YOUR-DEPLOYMENT-URL)**
+**[Live demo →](https://toggle-lab.vercel.app/)**
 
 ![Toggle Lab interface: a glowing neon switch on a dark canvas, with presets and DialKit controls in the sidebar](docs/screenshot.png)
 

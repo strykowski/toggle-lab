@@ -117,10 +117,46 @@ export function Listbox({ label, options, value, onChange, renderValue, renderOp
 }
 
 const PreviewBox = ({ stage, children, small }) => (
-  <span className={`select-preview${small ? " is-small" : ""} stage-${stage}`}>{children}</span>
+  <span className={`select-preview${small ? " is-small" : ""}${stage ? ` stage-${stage}` : " is-plain"}`}>{children}</span>
 );
 
-function PresetDropdown({ label, options, activeId, onSelect, stageFor }) {
+// Color presets: the palette itself, so it doesn't repeat the style thumbnail.
+function ColorChips({ v, small }) {
+  const colors = [v.Track.onColor, v.Track.offColor, v.Thumb.onColor];
+  const d = small ? 14 : 18;
+  return (
+    <span className="chips" aria-hidden="true">
+      {colors.map((c, i) => (
+        <span key={i} className="chips-dot" style={{ width: d, height: d, background: c }} />
+      ))}
+    </span>
+  );
+}
+
+// Shape presets: a line drawing of the geometry, drawn to a shared scale so sizes compare.
+function ShapeOutline({ v, small }) {
+  const { width: W, height: H, padding: pad, roundness } = v.Track;
+  const { size: S, roundness: thumbRound } = v.Thumb;
+  const [bw, bh] = small ? [36, 22] : [58, 32];
+  const overhang = Math.max(0, -pad); // rail-style thumbs stick out past the track end
+  const k = Math.min(small ? 0.42 : 0.66, bw / (W + overhang), bh / Math.max(H, S));
+  const sw = 1.25;
+  const w = W * k, h = H * k, s = S * k;
+  const boxH = Math.max(h, s) + sw * 2;
+  const ty = (boxH - h) / 2;
+  const tx = sw;
+  const cx = tx + (W - pad - S / 2) * k;
+  const cy = boxH / 2;
+  return (
+    <svg className="shape-outline" width={w + overhang * k + sw * 2} height={boxH} aria-hidden="true">
+      <rect x={tx} y={ty} width={w} height={h} rx={(roundness * Math.min(w, h)) / 2}
+        fill="none" stroke="currentColor" strokeWidth={sw} />
+      <rect x={cx - s / 2} y={cy - s / 2} width={s} height={s} rx={(thumbRound * s) / 2} fill="currentColor" />
+    </svg>
+  );
+}
+
+function PresetDropdown({ label, options, activeId, onSelect, renderPreview }) {
   return (
     <Listbox
       label={label}
@@ -129,17 +165,13 @@ function PresetDropdown({ label, options, activeId, onSelect, stageFor }) {
       onChange={onSelect}
       renderValue={(o) => (
         <>
-          <PreviewBox small stage={o ? stageFor(o) : "paper"}>
-            {o ? <MiniSwitch v={o.preview} box={[38, 24]} /> : <span className="select-custom-dot" />}
-          </PreviewBox>
+          {renderPreview(o, true)}
           <span className="select-label">{o ? o.label : "Custom"}</span>
         </>
       )}
       renderOption={(o) => (
         <>
-          <PreviewBox stage={stageFor(o)}>
-            <MiniSwitch v={o.preview} box={[60, 32]} />
-          </PreviewBox>
+          {renderPreview(o, false)}
           <span className="select-option-name">{o.label}</span>
         </>
       )}
@@ -148,7 +180,7 @@ function PresetDropdown({ label, options, activeId, onSelect, stageFor }) {
 }
 
 // ---------- Sidebar presets block ----------
-export function PresetsPanel({ v, stage, onStyle, onPartial, onRandom }) {
+export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
   const fpAll = fingerprint(v);
   const fpColor = fingerprint(pick(v, COLOR_KEYS));
   const fpShape = fingerprint(pick(v, SHAPE_KEYS));
@@ -181,15 +213,41 @@ export function PresetsPanel({ v, stage, onStyle, onPartial, onRandom }) {
       </div>
       <div className="preset-row">
         <span className="preset-row-label">Style</span>
-        <PresetDropdown label="Style" options={styleOpts} activeId={styleActive} onSelect={(o) => onStyle(o.preset)} stageFor={(o) => o.preset.stage} />
+        <PresetDropdown
+          label="Style"
+          options={styleOpts}
+          activeId={styleActive}
+          onSelect={(o) => onStyle(o.preset)}
+          renderPreview={(o, small) => (
+            <PreviewBox small={small} stage={o ? o.preset.stage : "paper"}>
+              {o ? <MiniSwitch v={o.preview} box={small ? [38, 24] : [60, 32]} /> : <span className="select-custom-dot" />}
+            </PreviewBox>
+          )}
+        />
       </div>
       <div className="preset-row">
         <span className="preset-row-label">Color</span>
-        <PresetDropdown label="Color" options={colorOpts} activeId={colorActive} onSelect={(o) => onPartial(o.vals)} stageFor={() => stage} />
+        <PresetDropdown
+          label="Color"
+          options={colorOpts}
+          activeId={colorActive}
+          onSelect={(o) => onPartial(o.vals)}
+          renderPreview={(o, small) => (
+            <PreviewBox small={small}><ColorChips v={o ? o.preview : v} small={small} /></PreviewBox>
+          )}
+        />
       </div>
       <div className="preset-row">
         <span className="preset-row-label">Shape</span>
-        <PresetDropdown label="Shape" options={shapeOpts} activeId={shapeActive} onSelect={(o) => onPartial(o.vals)} stageFor={() => stage} />
+        <PresetDropdown
+          label="Shape"
+          options={shapeOpts}
+          activeId={shapeActive}
+          onSelect={(o) => onPartial(o.vals)}
+          renderPreview={(o, small) => (
+            <PreviewBox small={small}><ShapeOutline v={o ? o.preview : v} small={small} /></PreviewBox>
+          )}
+        />
       </div>
     </section>
   );
