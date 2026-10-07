@@ -86,7 +86,7 @@ button { font: inherit; color: inherit; }
 .link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   color: var(--muted);
   font-size: 14px;
   text-decoration: none;
@@ -679,7 +679,9 @@ button { font: inherit; color: inherit; }
 }
 @media (max-width: 560px) {
   .topbar { padding: 0 12px; }
-  .link { display: none; }
+  /* Icon only on phones: the topbar has no room for the label. */
+  .link-text, .link-ext { display: none; }
+  .link { padding: 6px; margin-right: -6px; }
   .trace { width: 214px; }
   .stage-hint { display: none; }
   .sc-plans { grid-template-columns: 1fr; }
