@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { generateDocs, FRAMES } from "./docs.js";
+import { generateDocs, FRAMES, docsSpecs, liveOnly, A11Y } from "./docs.js";
 import { fingerprint } from "./presets.js";
+import { docsSvg, copyToFigma } from "./figma.js";
+import { FigmaIcon } from "./glyphs.jsx";
 
 const r = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 
@@ -14,13 +16,6 @@ const STATES = [
   { id: "pressed", label: "Pressed" },
   { id: "disabled", label: "Disabled" },
 ];
-
-function motionSummary(t) {
-  if (!t) return "—";
-  if (t.type === "easing") return `${r(t.duration * 1000, 0)} ms · cubic-bezier(${t.ease.map((x) => r(x)).join(", ")})`;
-  if (t.visualDuration != null) return `spring · ${r(t.visualDuration * 1000, 0)} ms · bounce ${r(t.bounce ?? 0)}`;
-  return `spring · stiffness ${r(t.stiffness ?? 100, 1)} · damping ${r(t.damping ?? 10, 1)}`;
-}
 
 // A pre-rendered switch image, positioned so its box is exactly the track.
 function Shot({ shot, docs, state, k = docs.k }) {
@@ -100,20 +95,13 @@ function States({ docs }) {
 
 function Motion({ docs }) {
   const { frames, curve, settle, v } = docs;
-  const M = v.Motion, E = v.Effects;
   const span = settle / (FRAMES - 1);
   const t0 = -span / 2, t1 = settle + span / 2;
   const lo = Math.min(-0.05, ...curve.map((c) => c.p)), hi = Math.max(1.05, ...curve.map((c) => c.p));
   const x = (t) => ((t - t0) / (t1 - t0)) * 1000;
   const y = (p) => 8 + (1 - (p - lo) / (hi - lo)) * 64;
   const path = curve.map((c, i) => `${i ? "L" : "M"}${r(x(c.t), 1)} ${r(y(c.p), 1)}`).join(" ");
-  const live = [
-    M.squash > 0 && `squash ${r(M.squash)}`,
-    M.pop > 0 && `pop ${r(M.pop)}`,
-    M.tilt > 0 && `${M.tilt}° tilt`,
-    E.trail > 0 && `trail ×${E.trail}`,
-    E.burst !== "none" && `${E.burst} burst`,
-  ].filter(Boolean);
+  const live = liveOnly(v);
   // Frames share one row, so wide switches are drawn smaller than in the states table.
   const kf = Math.min(docs.k, 112 / v.Track.width);
   const minW = FRAMES * Math.max(72, v.Track.width * kf + 32);
@@ -153,30 +141,7 @@ function Motion({ docs }) {
 }
 
 function Specs({ docs }) {
-  const { Track: T, Thumb: H, Icon: I, Label: L, Motion: M, Effects: E } = docs.v;
-  const sOff = Math.max(4, H.size * H.offScale);
-  const anatomy = [
-    ["Track", `${T.width} × ${T.height} px`],
-    ["Corner radius", `${r((T.roundness * Math.min(T.width, T.height)) / 2)} px`],
-    ["Padding", `${T.padding} px`],
-    ["Thumb", sOff !== H.size ? `${H.size} px · ${r(sOff)} px when off` : `${H.size} px`],
-    T.borderWidth > 0 && ["Border", `${T.borderWidth} px${T.borderOffOnly ? " · off only" : ""}`],
-    ["Press", `scale ${r(M.pressScale)} · stretch ${r(H.pressStretch)}×`],
-    ["Thumb motion", motionSummary(M.thumb)],
-    ["Fill motion", motionSummary(M.fill)],
-  ].filter(Boolean);
-  const tokens = [
-    ["Track off", T.offColor],
-    ["Track on", T.onColor],
-    ["Thumb off", H.offColor],
-    ["Thumb on", H.onColor],
-    T.borderWidth > 0 && ["Border", T.borderColor],
-    I.glyph !== "none" && ["Icon off", I.offColor],
-    I.glyph !== "none" && ["Icon on", I.onColor],
-    L.show && ["Label off", L.offColor],
-    L.show && ["Label on", L.onColor],
-    (E.glow > 0 || E.burst !== "none" || E.trail > 0) && ["Accent", E.color],
-  ].filter(Boolean);
+  const { anatomy, tokens } = docsSpecs(docs.v);
 
   return (
     <div className="docs-specs">
@@ -202,11 +167,9 @@ function Specs({ docs }) {
       <section className="docs-card" aria-labelledby="docs-a11y">
         <div className="docs-card-head"><h3 id="docs-a11y">Accessibility</h3></div>
         <ul className="docs-a11y">
-          <li>A native <code>button</code> with <code>role="switch"</code>; <code>aria-checked</code> carries the state.</li>
-          <li><kbd>Space</kbd> and <kbd>Enter</kbd> toggle it. Give every switch a visible label or an <code>aria-label</code>.</li>
-          <li>Focus ring: 2 px, 2 px offset, shown only for keyboard focus.</li>
-          <li>Disabled uses the native attribute: 50% opacity, no press feedback.</li>
-          <li>With reduced motion, the thumb uses a short ease-out and effects are skipped.</li>
+          {A11Y.map((line) => (
+            <li key={line}>{line.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : part))}</li>
+          ))}
         </ul>
       </section>
     </div>
@@ -216,6 +179,9 @@ function Specs({ docs }) {
 // Docs are a snapshot: generated once, then only regenerated when the user asks.
 export function Docs({ v, docs, onDocs, styleName }) {
   const [gen, setGen] = useState(null);
+  const [copied, setCopied] = useState(""); // "", "ok" or "error"
+  const copyTimer = useRef(null);
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
   const run = useRef(0);
   const fp = useMemo(() => fingerprint(v), [v]);
   const latest = useRef({ v, styleName });
@@ -239,6 +205,17 @@ export function Docs({ v, docs, onDocs, styleName }) {
 
   if (!docs || gen) return <div className="docs is-loading"><Loading gen={gen} /></div>;
 
+  const copy = async () => {
+    clearTimeout(copyTimer.current);
+    try {
+      await copyToFigma(docsSvg(docs, docs.name).svg);
+      setCopied("ok");
+    } catch {
+      setCopied("error");
+    }
+    copyTimer.current = setTimeout(() => setCopied(""), 2400);
+  };
+
   const stale = docs.fp !== fp;
   const time = new Date(docs.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return (
@@ -249,9 +226,15 @@ export function Docs({ v, docs, onDocs, styleName }) {
             <h2>Switch</h2>
             <code>role="switch"</code>
           </div>
-          <p className="docs-meta">
-            {docs.name ?? "Custom"} · Generated at {time}
-          </p>
+          <div className="docs-head-side">
+            <p className="docs-meta">
+              {docs.name ?? "Custom"} · Generated at {time}
+            </p>
+            <button type="button" className="btn btn-secondary btn-small btn-icon" onClick={copy}>
+              <FigmaIcon />
+              {copied === "ok" ? "Copied. Paste in Figma" : copied === "error" ? "Couldn’t copy" : "Copy to Figma"}
+            </button>
+          </div>
         </header>
         {stale && (
           <div className="docs-stale" role="status">

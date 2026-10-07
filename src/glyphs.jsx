@@ -35,3 +35,11 @@ export function Glyph({ name, state, size }) {
       dangerouslySetInnerHTML={{ __html: g[state] }} />
   );
 }
+
+// Figma's logo shape, as a line icon for "Copy to Figma" buttons.
+export const FigmaIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" aria-hidden="true">
+    <path d="M8 1H5.75a2.25 2.25 0 0 0 0 4.5H8zM8 1h2.25a2.25 2.25 0 0 1 0 4.5H8zM8 5.5H5.75a2.25 2.25 0 0 0 0 4.5H8zM8 10H5.75a2.25 2.25 0 1 0 2.25 2.25z" />
+    <circle cx="10.25" cy="7.75" r="2.25" />
+  </svg>
+);

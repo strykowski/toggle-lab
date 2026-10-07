@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cssExport, reactExport } from "./codegen.js";
 import { switchSvg, svgDataUrl, svgToPngBlob } from "./svgExport.js";
+import { buildDocs } from "./docs.js";
+import { docsSvg, switchForFigma, copyToFigma } from "./figma.js";
+import { FigmaIcon } from "./glyphs.jsx";
 
 // Downloads: a normal browser download everywhere, except when the page is hosted
 // inside the claude.ai artifact viewer, which only allows saves through its "downloads"
@@ -43,11 +46,17 @@ function Seg({ label, value, onChange, options }) {
   );
 }
 
+// Figma knows the fonts as "Geist" and "Geist Mono"; this page loads them as variable fonts.
+const previewFonts = (svg) => svg
+  .replaceAll('font-family="Geist Mono"', 'font-family="Geist Mono, Geist Mono Variable, monospace"')
+  .replaceAll('font-family="Geist"', 'font-family="Geist, Geist Variable, sans-serif"');
+
 export function CodeDrawer({ open, onClose, v, name }) {
   const [tab, setTab] = useState("css");
   const [status, setStatus] = useState("");
   const [state, setState] = useState(true);
   const [scale, setScale] = useState(2);
+  const [figmaWhat, setFigmaWhat] = useState("switch");
   const closeRef = useRef(null);
   const reduce = useReducedMotion();
   const dl = useDownloads();
@@ -65,6 +74,8 @@ export function CodeDrawer({ open, onClose, v, name }) {
 
   const code = useMemo(() => (tab === "css" ? cssExport(v) : tab === "react" ? reactExport(v) : ""), [tab, v]);
   const image = useMemo(() => switchSvg(v, state), [v, state]);
+  // Docs for Figma are built from the current values on demand (a few ms), not the docs view's snapshot.
+  const figmaDocs = useMemo(() => (open && tab === "figma" && figmaWhat === "docs" ? docsSvg(buildDocs(v), name) : null), [open, tab, figmaWhat, v, name]);
   const slug = (name || "custom").toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const base = `switch-${slug}-${state ? "on" : "off"}`;
 
@@ -74,6 +85,14 @@ export function CodeDrawer({ open, onClose, v, name }) {
       flash(`Copied ${what}`);
     } catch {
       flash("Copying isn't allowed here. Select the code and copy it manually.");
+    }
+  };
+  const copyFigma = async () => {
+    try {
+      await copyToFigma(figmaWhat === "docs" ? figmaDocs.svg : switchForFigma(image.svg));
+      flash("Copied. Paste into Figma with ⌘V or Ctrl+V.");
+    } catch {
+      flash("Copying isn't allowed here.");
     }
   };
   const copyPng = async () => {
@@ -123,7 +142,7 @@ export function CodeDrawer({ open, onClose, v, name }) {
             transition={{ duration: 0.36, ease: [0.32, 0.72, 0, 1] }}
           >
             <header className="drawer-head">
-              <h2 id="drawer-title">Get code</h2>
+              <h2 id="drawer-title">Export</h2>
               <button ref={closeRef} type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
               </button>
@@ -133,6 +152,7 @@ export function CodeDrawer({ open, onClose, v, name }) {
                 { id: "css", label: "HTML + CSS" },
                 { id: "react", label: "React + Motion" },
                 { id: "image", label: "Image" },
+                { id: "figma", label: "Figma" },
               ].map((t) => (
                 <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="tab" onClick={() => setTab(t.id)}>
                   {t.label}
@@ -140,7 +160,37 @@ export function CodeDrawer({ open, onClose, v, name }) {
               ))}
             </div>
 
-            {tab !== "image" ? (
+            {tab === "figma" ? (
+              <div className="drawer-body">
+                <div className="img-controls">
+                  <Seg label="Copy" value={figmaWhat} onChange={setFigmaWhat} options={[{ value: "switch", label: "Switch" }, { value: "docs", label: "Docs" }]} />
+                  {figmaWhat === "switch" && (
+                    <Seg label="State" value={state} onChange={setState} options={[{ value: false, label: "Off" }, { value: true, label: "On" }]} />
+                  )}
+                </div>
+                {figmaWhat === "switch" ? (
+                  <div className="img-preview">
+                    <img src={svgDataUrl(image.svg)} alt={`Switch, ${state ? "on" : "off"}`} style={{ width: Math.min(image.width * 3, 520) }} />
+                  </div>
+                ) : (
+                  // Inline rather than <img>, so the preview uses the page's Geist font like Figma will.
+                  <div className="figma-preview" aria-label="Documentation frame preview" role="img"
+                    dangerouslySetInnerHTML={{ __html: previewFonts(figmaDocs?.svg ?? "") }} />
+                )}
+                <div className="drawer-actions">
+                  <span className="muted drawer-note">
+                    {figmaWhat === "switch"
+                      ? "The switch as editable vector layers."
+                      : "The documentation page as one frame: states, motion, anatomy and colors."}
+                    {" "}Text uses Geist.
+                  </span>
+                  <button type="button" className="btn btn-primary btn-small btn-icon" onClick={copyFigma}>
+                    <FigmaIcon />
+                    Copy to Figma
+                  </button>
+                </div>
+              </div>
+            ) : tab !== "image" ? (
               <div className="drawer-body">
                 <div className="drawer-actions">
                   <span className="muted drawer-note">

@@ -15,7 +15,7 @@ A playground for designing switch components. Shape it, color it, tune its motio
 - **See it in context.** Swap the plain canvas for real scenes: a phone settings screen, a dashboard, a pricing page where the toggle flips the prices, a sign-in form, a site navbar with a working theme switch, a smart-home panel and a sci-fi cockpit.
 - **Document it.** The Documentation view generates a spec sheet for the current switch: every state (default, focus, pressed, disabled) on light and dark surfaces, a filmstrip of the off-to-on motion, and its dimensions and colors. It's a snapshot, so it only regenerates when you ask.
 - **Study the motion.** Slow it down to ½× or ¼×, loop it, and watch a live graph of the thumb's position to see overshoot and settle time.
-- **Take it with you.** Get HTML + CSS (springs are sampled into CSS `linear()` curves), a React + Motion component, or an SVG / PNG at 1×, 2× or 3×.
+- **Take it with you.** Get HTML + CSS (springs are sampled into CSS `linear()` curves), a React + Motion component, an SVG / PNG at 1×, 2× or 3×, or copy it to Figma as editable layers: the switch alone or the whole documentation page.
 
 ## Getting started
 
@@ -49,7 +49,8 @@ src/
   scenes.jsx       Contextual scenes (settings, pricing, cockpit, ...)
   Docs.jsx         Documentation view: states matrix, motion filmstrip, specs
   docs.js          Renders the documentation snapshot in small steps
-  CodeDrawer.jsx   "Get code" drawer: code tabs and image export
+  CodeDrawer.jsx   Export drawer: code, image and Figma tabs
+  figma.js         "Copy to Figma": the switch or the whole docs page as one SVG frame
   codegen.js       HTML + CSS and React code generators
   svgExport.js     Static SVG renderer (image export and preset thumbnails)
   transitions.js   Spring / easing conversions, CSS linear() sampling
