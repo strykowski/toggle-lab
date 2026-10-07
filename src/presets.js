@@ -424,3 +424,41 @@ export function overlay(values, partial) {
   for (const [g, vals] of Object.entries(partial)) out[g] = { ...values[g], ...vals };
   return out;
 }
+
+// ---------- Label fit ----------
+// Inside labels sit between the track end and the thumb. Mixed presets (e.g. FUI's
+// "ARMED" on a Classic shape) can leave too little room, so check before applying.
+const MIN_LABEL = 7;
+let measurer;
+function textWidth(text, size, font) {
+  const family = font === "mono"
+    ? '"Geist Mono Variable", ui-monospace, monospace'
+    : '"Geist Variable", ui-sans-serif, system-ui, sans-serif';
+  const tracking = text.length * size * 0.02; // .tg-label letter-spacing
+  try {
+    measurer ??= document.createElement("canvas").getContext("2d");
+    measurer.font = `600 ${size}px ${family}`;
+    return measurer.measureText(text).width + tracking;
+  } catch {
+    return text.length * size * (font === "mono" ? 0.6 : 0.7) + tracking;
+  }
+}
+
+export function labelFits(v) {
+  const { Track: T, Thumb: H, Label: L } = v;
+  if (!L.show) return true;
+  const room = T.width - H.size - 2 * Math.max(0, T.padding);
+  const gap = Math.max(4, L.size * 0.6);
+  const widest = Math.max(textWidth(L.onText, L.size, L.font), textWidth(L.offText, L.size, L.font));
+  return widest + gap <= room && L.size <= T.height - 4;
+}
+
+// Shrink the label until it fits; null if even the smallest size doesn't.
+export function fitLabel(v) {
+  if (labelFits(v)) return v;
+  for (let size = v.Label.size - 0.5; size >= MIN_LABEL; size -= 0.5) {
+    const next = overlay(v, { Label: { size } });
+    if (labelFits(next)) return next;
+  }
+  return null;
+}

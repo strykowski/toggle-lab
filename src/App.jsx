@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DialRoot, DialStore, useDialKitController } from "dialkit";
 import { useReducedMotion } from "motion/react";
 import { Toggle } from "./Toggle.jsx";
-import { CONFIG, PANEL_ID, PRESETS, PALETTES, SHAPES, TRANSITION_PATHS, transitionMode, fingerprint, paletteValues, overlay } from "./presets.js";
+import { CONFIG, PANEL_ID, PRESETS, PALETTES, SHAPES, TRANSITION_PATHS, transitionMode, fingerprint, paletteValues, overlay, fitLabel } from "./presets.js";
 import { settleMs } from "./transitions.js";
 import { PresetsPanel, Listbox } from "./Presets.jsx";
 import { SCENES, SceneCtx, SceneIcon } from "./scenes.jsx";
@@ -41,6 +41,15 @@ const pickRandom = (arr, not) => {
   return pool[Math.floor(Math.random() * pool.length)];
 };
 
+const shuffle = (arr) => {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
 export default function App() {
   const dial = useDialKitController("Toggle", CONFIG, { id: PANEL_ID, persist: true });
   const v = dial.values;
@@ -51,6 +60,8 @@ export default function App() {
   const [zoom, setZoom] = useStored("zoom", 2);
   const [slow, setSlow] = useState(1);
   const [loop, setLoop] = useState(false);
+  const [graph, setGraph] = useStored("graph", false);
+  const [logoOn, setLogoOn] = useState(true);
   const [codeOpen, setCodeOpen] = useState(false);
   const codeBtn = useRef(null);
   const reduceMotion = useReducedMotion();
@@ -91,9 +102,18 @@ export default function App() {
   const randomize = () => {
     const style = pickRandom(PRESETS, lastRandom.current.style);
     const pal = pickRandom(PALETTES, lastRandom.current.pal);
-    const shape = pickRandom(SHAPES, lastRandom.current.shape);
+    const colored = overlay(style.values, paletteValues(pal));
+    // Only use a shape the style's inside label (if any) still fits in; otherwise keep
+    // the style's own geometry, which was designed around its label.
+    let shape = null;
+    let mixed = null;
+    const shapes = shuffle(SHAPES.length > 1 ? SHAPES.filter((s) => s !== lastRandom.current.shape) : SHAPES);
+    for (const s of shapes) {
+      mixed = fitLabel(overlay(colored, s.values));
+      if (mixed) { shape = s; break; }
+    }
+    mixed ??= fitLabel(colored) ?? colored;
     lastRandom.current = { style, pal, shape };
-    const mixed = overlay(overlay(style.values, paletteValues(pal)), shape.values);
     const darkPal = ["midnight", "cyber"].includes(pal.id);
     applyValues(mixed, darkPal ? "ink" : style.stage);
   };
@@ -114,12 +134,24 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true"><span /></span>
+          <button
+            type="button"
+            className="brand-mark"
+            role="switch"
+            aria-checked={logoOn}
+            aria-label="Toggle Lab logo"
+            onClick={() => setLogoOn((o) => !o)}
+          >
+            <span />
+          </button>
           <span className="brand-name">Toggle Lab</span>
         </div>
         <div className="topbar-actions">
           <a className="link" href="https://github.com/joshpuckett/dialkit" target="_blank" rel="noreferrer">
             Built with DialKit
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M4.5 2.5h5v5M9.5 2.5L3 9" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </a>
           <button type="button" className="btn btn-secondary" onClick={() => applyStyle(PRESETS[0])}>
             Reset
@@ -199,14 +231,20 @@ export default function App() {
                 options={SPEEDS.map((s) => ({ value: s.id, label: s.label, title: s.id === 1 ? "Real time" : `Slow motion ${s.label}` }))}
               />
             </div>
-            <button type="button" className="chip" aria-pressed={loop} onClick={() => setLoop((l) => !l)}>
-              <span className="chip-dot" aria-hidden="true" />
-              Loop
-            </button>
+            <div className="toolbar-group">
+              <button type="button" className="chip" aria-pressed={graph} onClick={() => setGraph((g) => !g)}>
+                <span className="chip-dot" aria-hidden="true" />
+                Graph
+              </button>
+              <button type="button" className="chip" aria-pressed={loop} onClick={() => setLoop((l) => !l)}>
+                <span className="chip-dot" aria-hidden="true" />
+                Loop
+              </button>
+            </div>
           </div>
 
           <div className="stage-footer">
-            <Trace trace={trace} slow={slow} settle={settle} />
+            {graph && <Trace trace={trace} slow={slow} settle={settle} />}
             <p className="stage-hint">
               {reduceMotion
                 ? "Reduced motion is on, so trail, bursts, and squash are paused."
@@ -219,7 +257,6 @@ export default function App() {
       <aside className="panel" aria-label="Controls">
         <PresetsPanel
           v={v}
-          stage={bg}
           onStyle={applyStyle}
           onPartial={(partial) => dial.setValues(partial)}
           onRandom={randomize}
