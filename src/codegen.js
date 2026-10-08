@@ -239,7 +239,7 @@ export function reactExport(v) {
         transition={fill}
         style={{ ...labelStyle, left: ${r((g.pad + g.onC - g.S / 2) / 2)}, color: "${L.onColor}" }}
       >
-        ${L.onText}
+        {${JSON.stringify(L.onText)}}
       </motion.span>
       <motion.span
         aria-hidden
@@ -248,7 +248,7 @@ export function reactExport(v) {
         transition={fill}
         style={{ ...labelStyle, left: ${r((g.offC + g.S / 2 + g.W - g.pad) / 2)}, color: "${L.offColor}" }}
       >
-        ${L.offText}
+        {${JSON.stringify(L.offText)}}
       </motion.span>`
     : "";
 

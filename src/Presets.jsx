@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { PRESETS, PALETTES, SHAPES, COLOR_KEYS, SHAPE_KEYS, paletteValues, pick, overlay, fingerprint } from "./presets.js";
 import { switchSvg, svgDataUrl } from "./svgExport.js";
+import { MOD } from "./keys.js";
 
 // Static thumbnail rendered from the same SVG the exporter produces.
 export function MiniSwitch({ v, checked = true, box }) {
@@ -183,7 +184,35 @@ function PresetDropdown({ label, options, activeId, onSelect, renderPreview }) {
 }
 
 // ---------- Sidebar presets block ----------
-export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
+// Lock a part so Randomize keeps it.
+function LockButton({ what, locked, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="lock-btn"
+      aria-pressed={locked}
+      aria-label={`Keep ${what} when randomizing`}
+      title={locked ? `${what[0].toUpperCase() + what.slice(1)} is locked: Randomize keeps it` : `Lock ${what} for Randomize`}
+      onClick={onToggle}
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <rect x="2.5" y="6.25" width="9" height="6.25" rx="1.6" fill={locked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.3" />
+        <path d={locked ? "M4.5 6.25V4.6a2.5 2.5 0 0 1 5 0v1.65" : "M4.5 6.25V4.6a2.5 2.5 0 0 1 4.9-.7"} fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+const ArrowIcon = ({ flip }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style={flip ? { transform: "scaleX(-1)" } : undefined}>
+    <path d="M6 4L3 7l3 3M3.5 7h6a3.5 3.5 0 0 1 0 7H8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+export function PresetsPanel({
+  v, onStyle, onPartial, onRandom, locks, onLock, allLocked,
+  canUndo, canRedo, onUndo, onRedo, recent, currentFp, onRecent,
+}) {
   const fpAll = fingerprint(v);
   const fpColor = fingerprint(pick(v, COLOR_KEYS));
   const fpShape = fingerprint(pick(v, SHAPE_KEYS));
@@ -204,7 +233,17 @@ export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
     <section className="presets-panel" aria-labelledby="presets-title">
       <div className="presets-head">
         <h2 id="presets-title" className="panel-title">Presets</h2>
-        <button type="button" className="btn btn-secondary btn-small btn-icon" onClick={onRandom}>
+        <div className="presets-actions">
+        <button type="button" className="icon-btn icon-btn-small" onClick={onUndo} disabled={!canUndo}
+          aria-label="Undo" title={`Undo (${MOD}Z)`} aria-keyshortcuts={MOD === "⌘" ? "Meta+Z" : "Control+Z"}>
+          <ArrowIcon />
+        </button>
+        <button type="button" className="icon-btn icon-btn-small" onClick={onRedo} disabled={!canRedo}
+          aria-label="Redo" title={`Redo (${MOD === "⌘" ? "⇧⌘Z" : "Ctrl+Shift+Z"})`} aria-keyshortcuts={MOD === "⌘" ? "Meta+Shift+Z" : "Control+Shift+Z"}>
+          <ArrowIcon flip />
+        </button>
+        <button type="button" className="btn btn-secondary btn-small btn-icon" onClick={onRandom} disabled={allLocked}
+          title={allLocked ? "Unlock style, color or shape to randomize" : "Randomize (R)"} aria-keyshortcuts="R">
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <rect x="2" y="2" width="12" height="12" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4" />
             <circle cx="5.5" cy="5.5" r="1.1" fill="currentColor" /><circle cx="10.5" cy="10.5" r="1.1" fill="currentColor" />
@@ -213,9 +252,13 @@ export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
           </svg>
           Randomize
         </button>
+        </div>
       </div>
       <div className="preset-row">
-        <span className="preset-row-label">Style</span>
+        <span className="preset-row-label">
+          Style
+          <LockButton what="style" locked={locks.style} onToggle={() => onLock("style")} />
+        </span>
         <PresetDropdown
           label="Style"
           options={styleOpts}
@@ -229,7 +272,10 @@ export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
         />
       </div>
       <div className="preset-row">
-        <span className="preset-row-label">Color</span>
+        <span className="preset-row-label">
+          Color
+          <LockButton what="color" locked={locks.color} onToggle={() => onLock("color")} />
+        </span>
         <PresetDropdown
           label="Color"
           options={colorOpts}
@@ -241,7 +287,10 @@ export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
         />
       </div>
       <div className="preset-row">
-        <span className="preset-row-label">Shape</span>
+        <span className="preset-row-label">
+          Shape
+          <LockButton what="shape" locked={locks.shape} onToggle={() => onLock("shape")} />
+        </span>
         <PresetDropdown
           label="Shape"
           options={shapeOpts}
@@ -252,6 +301,27 @@ export function PresetsPanel({ v, onStyle, onPartial, onRandom }) {
           )}
         />
       </div>
+      {recent.length > 0 && (
+        <div className="preset-row">
+          <span className="preset-row-label">Recent</span>
+          <div className="recent" role="list" aria-label="Recent Randomize results">
+            {recent.map((e, i) => (
+              <button
+                key={`${i}-${e.fp}`}
+                type="button"
+                role="listitem"
+                className="recent-item"
+                aria-current={e.fp === currentFp || undefined}
+                aria-label={`Restore ${e.label || "random switch"}`}
+                title={e.label}
+                onClick={() => onRecent(e)}
+              >
+                <PreviewBox small stage={e.stage}><MiniSwitch v={e.values} box={[32, 20]} /></PreviewBox>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,12 +1,14 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DialRoot, DialStore, useDialKitController } from "dialkit";
-import { useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Toggle } from "./Toggle.jsx";
-import { CONFIG, PANEL_ID, PRESETS, PALETTES, SHAPES, TRANSITION_PATHS, transitionMode, fingerprint, paletteValues, overlay, fitLabel } from "./presets.js";
+import { CONFIG, PANEL_ID, PRESETS, PALETTES, SHAPES, TRANSITION_PATHS, COLOR_KEYS, SHAPE_KEYS, transitionMode, fingerprint, paletteValues, overlay, pick, fitLabel } from "./presets.js";
 import { settleMs } from "./transitions.js";
 import { PresetsPanel, Listbox } from "./Presets.jsx";
 import { SCENES, SceneCtx, SceneIcon } from "./scenes.jsx";
 import { CodeDrawer } from "./CodeDrawer.jsx";
+import { MOD } from "./keys.js";
+import { sanitize, STAGES, encodeShare, decodeShare, shareUrl, readShareHash } from "./share.js";
 
 // Loaded on first visit to the Documentation view.
 const Docs = lazy(() => import("./Docs.jsx").then((m) => ({ default: m.Docs })));
@@ -72,6 +74,23 @@ function useStored(key, initial) {
   return [v, setV];
 }
 
+const HISTORY_LIMIT = 100;
+const RECENT_LIMIT = 8;
+const COMMIT_MS = 400; // a slider drag becomes one undo step once it settles
+
+const VALUES_KEY = "toggle-lab:values";
+function readSavedValues() {
+  try {
+    const raw = localStorage.getItem(VALUES_KEY);
+    return raw ? sanitize(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+function saveValues(values) {
+  try { localStorage.setItem(VALUES_KEY, JSON.stringify(values)); } catch { /* storage unavailable */ }
+}
+
 const pickRandom = (arr, not) => {
   const pool = arr.length > 1 ? arr.filter((x) => x !== not) : arr;
   return pool[Math.floor(Math.random() * pool.length)];
@@ -104,6 +123,17 @@ export default function App() {
   const reduceMotion = useReducedMotion();
   const trace = useRef([]);
   const lastRandom = useRef({});
+  const [locks, setLocks] = useStored("locks", { style: false, color: false, shape: false });
+  const [recentRaw, setRecent] = useStored("recent", []);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(0);
+  const prevScene = useRef("canvas");
+
+  const showToast = useCallback((msg) => {
+    clearTimeout(toastTimer.current);
+    setToast({ msg, id: Date.now() });
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setChecked(true), 650);
@@ -119,41 +149,199 @@ export default function App() {
   const fp = useMemo(() => fingerprint(v), [v]);
   const activeStyle = useMemo(() => PRESETS.find((p) => fingerprint(p.values) === fp) ?? null, [fp]);
 
+  // Stored history is untrusted (it outlives schema changes), so it's sanitized like a shared link.
+  const recent = useMemo(() => (Array.isArray(recentRaw) ? recentRaw : [])
+    .filter((e) => e && typeof e === "object" && e.values)
+    .slice(0, RECENT_LIMIT)
+    .map((e) => {
+      const values = sanitize(e.values);
+      return { values, fp: fingerprint(values), stage: STAGES.includes(e.stage) ? e.stage : "paper", label: String(e.label ?? "").slice(0, 80) };
+    }), [recentRaw]);
+
   const replay = () => {
     setChecked(false);
     setTimeout(() => setChecked(true), 260);
   };
 
-  const applyValues = (values, stageHint) => {
+  const applyValues = (values, stageHint, { animate = true } = {}) => {
     dial.setValues(values);
     for (const path of TRANSITION_PATHS) {
       const [g, k] = path.split(".");
       DialStore.updateTransitionMode(PANEL_ID, path, transitionMode(values[g][k]));
     }
     if (stageHint) setBg(stageHint);
-    replay();
+    if (animate) replay();
   };
+
+  // ---- Undo / redo ----
+  // Every settled change to the values is a step: presets, Randomize, shared links and
+  // DialKit edits alike. Changes made by undo/redo themselves are skipped.
+  const hist = useRef({ past: [], future: [], current: null, skip: null, timer: 0 });
+  const latest = useRef(null);
+  latest.current = { values: v, fp, stage: bg };
+  const [, setHistVersion] = useState(0);
+  const commit = useCallback(() => {
+    const h = hist.current;
+    clearTimeout(h.timer);
+    h.timer = 0;
+    const next = latest.current;
+    if (!h.current || next.fp === h.current.fp) return;
+    h.past.push(h.current);
+    if (h.past.length > HISTORY_LIMIT) h.past.shift();
+    h.future = [];
+    h.current = next;
+    setHistVersion((n) => n + 1);
+  }, []);
+  useEffect(() => {
+    const h = hist.current;
+    if (!h.current) {
+      h.current = latest.current;
+      // DialKit restores saved values approximately: it rounds to slider steps and drops an
+      // easing thumb curve (its config default is a spring). Put back our exact copy.
+      const saved = readSavedValues();
+      if (saved && fingerprint(saved) !== fp) {
+        h.current = { values: saved, fp: fingerprint(saved), stage: bg };
+        h.skip = h.current.fp;
+        applyValues(saved, null, { animate: false });
+      }
+      return;
+    }
+    if (h.skip === fp) { h.skip = null; h.current = latest.current; return; }
+    clearTimeout(h.timer);
+    h.timer = setTimeout(commit, COMMIT_MS);
+  }, [fp, commit]);
+  useEffect(() => () => clearTimeout(hist.current.timer), []);
+
+  // Exact copy of the values, saved shortly after each change and when the page is hidden.
+  useEffect(() => {
+    const t = setTimeout(() => saveValues(latest.current.values), 300);
+    return () => clearTimeout(t);
+  }, [fp]);
+  useEffect(() => {
+    const flush = () => saveValues(latest.current.values);
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, []);
+
+  const step = (from, to, label) => {
+    const h = hist.current;
+    if (h.timer) commit(); // an edit still settling counts as the latest step
+    if (!h[from].length) { showToast(`Nothing to ${label.toLowerCase()}`); return; }
+    const target = h[from].pop();
+    h[to].push(h.current);
+    h.current = target;
+    h.skip = target.fp;
+    applyValues(target.values, target.stage, { animate: false });
+    setHistVersion((n) => n + 1);
+    showToast(label);
+  };
+  const undo = () => step("past", "future", "Undo");
+  const redo = () => step("future", "past", "Redo");
 
   const applyStyle = (p) => applyValues(p.values, p.stage);
 
+  const allLocked = locks.style && locks.color && locks.shape;
   const randomize = () => {
-    const style = pickRandom(PRESETS, lastRandom.current.style);
-    const pal = pickRandom(PALETTES, lastRandom.current.pal);
-    const colored = overlay(style.values, paletteValues(pal));
-    // Only use a shape the style's inside label (if any) still fits in; otherwise keep
-    // the style's own geometry, which was designed around its label.
-    let shape = null;
-    let mixed = null;
-    const shapes = shuffle(SHAPES.length > 1 ? SHAPES.filter((s) => s !== lastRandom.current.shape) : SHAPES);
-    for (const s of shapes) {
-      mixed = fitLabel(overlay(colored, s.values));
-      if (mixed) { shape = s; break; }
+    if (allLocked) { showToast("Everything is locked. Unlock something to randomize."); return; }
+    const last = lastRandom.current;
+    const others = (arr, not) => shuffle(arr.length > 1 ? arr.filter((x) => x !== not) : arr);
+    // A locked part keeps what's on screen now; null below means "keep current".
+    const styles = locks.style ? [null] : others(PRESETS, last.style);
+    const pal = locks.color ? null : pickRandom(PALETTES, last.pal);
+    const shapes = locks.shape ? [null] : others(SHAPES, last.shape);
+    const colors = pal ? paletteValues(pal) : pick(v, COLOR_KEYS);
+    const geometry = pick(v, SHAPE_KEYS);
+
+    // Only use a combination the inside label (if any) still fits in.
+    let pickd = null;
+    for (const style of styles) {
+      const colored = overlay(style ? style.values : v, colors);
+      for (const shape of shapes) {
+        const mixed = fitLabel(overlay(colored, shape ? shape.values : geometry));
+        if (mixed) { pickd = { style, shape, mixed }; break; }
+      }
+      if (pickd) break;
     }
-    mixed ??= fitLabel(colored) ?? colored;
-    lastRandom.current = { style, pal, shape };
-    const darkPal = ["midnight", "cyber"].includes(pal.id);
-    applyValues(mixed, darkPal ? "ink" : style.stage);
+    if (!pickd) {
+      // Nothing fits: keep the style's own geometry (designed around its label) unless shape is locked.
+      const style = styles[0];
+      const colored = overlay(style ? style.values : v, colors);
+      const mixed = locks.shape ? overlay(colored, geometry) : colored;
+      pickd = { style, shape: null, mixed: fitLabel(mixed) ?? mixed };
+    }
+    const { style, shape, mixed } = pickd;
+    lastRandom.current = { style: style ?? last.style, pal: pal ?? last.pal, shape: shape ?? last.shape };
+    const stage = pal && ["midnight", "cyber"].includes(pal.id) ? "ink" : style ? style.stage : null;
+    const label = [style?.name, pal?.name, shape?.name].filter(Boolean).join(" · ");
+    setRecent((list) => [{ values: mixed, stage: stage ?? bg, label }, ...(Array.isArray(list) ? list : [])].slice(0, RECENT_LIMIT));
+    applyValues(mixed, stage);
   };
+
+  // ---- Share links ----
+  const share = () => {
+    const url = encodeShare(v, bg).then(shareUrl);
+    const done = () => showToast("Link copied");
+    const fail = () => url.then((u) => {
+      showToast("Couldn't copy the link automatically");
+      window.prompt("Copy this link", u);
+    });
+    // ClipboardItem with a promise keeps Safari's user-gesture check happy while the link is encoded.
+    if (typeof ClipboardItem === "function" && navigator.clipboard?.write) {
+      const blob = url.then((u) => new Blob([u], { type: "text/plain" }));
+      navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]).then(done, () =>
+        url.then((u) => navigator.clipboard.writeText(u)).then(done, fail));
+    } else {
+      url.then((u) => navigator.clipboard.writeText(u)).then(done, fail);
+    }
+  };
+
+  const toggleDocs = () => {
+    if (scene === "docs") setScene(prevScene.current === "docs" ? "canvas" : prevScene.current);
+    else { prevScene.current = scene; setScene("docs"); }
+  };
+
+  // Latest handlers for listeners registered once.
+  const actions = useRef({});
+  actions.current = { applyValues, showToast, undo, redo, randomize, toggleDocs, codeOpen };
+
+  // Open a shared link: on load, and when a link is pasted into this tab's address bar.
+  useEffect(() => {
+    const load = async () => {
+      const code = readShareHash();
+      if (!code) return;
+      history.replaceState(null, "", location.pathname + location.search); // reloads shouldn't re-apply it
+      const data = await decodeShare(code);
+      if (!data) { actions.current.showToast("That share link is broken or incomplete."); return; }
+      actions.current.applyValues(data.values, data.stage);
+      actions.current.showToast(`Opened a shared switch. ${MOD}Z brings yours back.`);
+    };
+    load();
+    window.addEventListener("hashchange", load);
+    return () => window.removeEventListener("hashchange", load);
+  }, []);
+
+  // ---- Keyboard shortcuts: R randomize, E export, D docs, ⌘Z / ⇧⌘Z undo and redo ----
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.isComposing || (e.repeat && e.key.toLowerCase() !== "z")) return;
+      const a = actions.current;
+      if (a.codeOpen) return;
+      if (e.target.closest?.('input, textarea, select, [contenteditable="true"], [role="listbox"], [role="dialog"]')) return;
+      const k = e.key.toLowerCase();
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && !e.altKey && (k === "z" || k === "y")) {
+        e.preventDefault();
+        if (k === "y" || e.shiftKey) a.redo(); else a.undo();
+        return;
+      }
+      if (mod || e.altKey) return;
+      if (k === "r") { e.preventDefault(); a.randomize(); }
+      else if (k === "e") { e.preventDefault(); setCodeOpen(true); }
+      else if (k === "d") { e.preventDefault(); a.toggleDocs(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const closeCode = useCallback(() => {
     setCodeOpen(false);
@@ -197,12 +385,20 @@ export default function App() {
           <button type="button" className="btn btn-secondary" onClick={() => applyStyle(PRESETS[0])}>
             Reset
           </button>
+          <button type="button" className="btn btn-secondary btn-icon btn-share" onClick={share} aria-label="Copy a share link">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M6.8 9.2a3 3 0 0 0 4.3.2l2-2a3 3 0 0 0-4.3-4.3l-.9.9M9.2 6.8a3 3 0 0 0-4.3-.2l-2 2a3 3 0 0 0 4.3 4.3l.9-.9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="btn-share-text">Share</span>
+          </button>
           <button
             ref={codeBtn}
             type="button"
             className="btn btn-primary btn-icon"
             aria-haspopup="dialog"
             aria-expanded={codeOpen}
+            aria-keyshortcuts="E"
+            title="Export (E)"
             onClick={() => setCodeOpen(true)}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
@@ -309,11 +505,38 @@ export default function App() {
           onStyle={applyStyle}
           onPartial={(partial) => dial.setValues(partial)}
           onRandom={randomize}
+          locks={locks}
+          onLock={(key) => setLocks((l) => ({ ...l, [key]: !l[key] }))}
+          allLocked={allLocked}
+          canUndo={hist.current.past.length > 0 || !!hist.current.timer}
+          canRedo={hist.current.future.length > 0}
+          onUndo={undo}
+          onRedo={redo}
+          recent={recent}
+          currentFp={fp}
+          onRecent={(e) => applyValues(e.values, e.stage)}
         />
         <DialRoot mode="inline" theme="light" productionEnabled />
       </aside>
 
       <CodeDrawer open={codeOpen} onClose={closeCode} v={v} name={activeStyle?.name} />
+
+      <div className="toast-region" role="status" aria-live="polite">
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              key={toast.id}
+              className="toast"
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, transition: { duration: 0.15 } }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            >
+              {toast.msg}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

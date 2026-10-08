@@ -5,7 +5,7 @@ export const PANEL_ID = "toggle-lab";
 export const CONFIG = {
   Track: {
     width: [44, 24, 160, 1],
-    height: [24, 12, 80, 1],
+    height: [24, 6, 80, 1], // min 6: Lightsaber is 8 px, and DialKit clamps saved values to the slider
     roundness: [1, 0, 1, 0.01],
     padding: [2, -10, 14, 0.5],
     offColor: "#d9d9d9",

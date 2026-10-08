@@ -12,6 +12,8 @@ A playground for designing switch components. Shape it, color it, tune its motio
 
 - **Tune everything live.** Around 50 controls in a [DialKit](https://github.com/joshpuckett/dialkit) panel: track and thumb geometry, colors, borders, depth, springs and easing curves, squash and stretch, glow, trails, bursts, surface finishes, 3D tilt and stepped motion.
 - **Start from presets.** 21 styles, from familiar (Cupertino, Material, Brutal) to experimental (FUI, Holographic, Lightsaber, Pixel, Plasma). Color and shape presets apply on their own, so you can mix them with any style, or hit **Randomize**.
+- **Explore freely.** Hit **Randomize** (or press **R**) for a new mix, lock style, color or shape to keep them, and click back through recent results. Every change can be undone with **⌘Z** / **Ctrl+Z**.
+- **Share it.** **Share** copies a link that opens your exact switch for anyone, no account needed.
 - **See it in context.** Swap the plain canvas for real scenes: a phone settings screen, a dashboard, a pricing page where the toggle flips the prices, a sign-in form, a site navbar with a working theme switch, a smart-home panel and a sci-fi cockpit.
 - **Document it.** The Documentation view generates a spec sheet for the current switch: every state (default, focus, pressed, disabled) on light and dark surfaces, a filmstrip of the off-to-on motion, and its dimensions and colors. It's a snapshot, so it only regenerates when you ask.
 - **Study the motion.** Slow it down to ½× or ¼×, loop it, and watch a live graph of the thumb's position to see overshoot and settle time.
@@ -29,6 +31,16 @@ npm run preview  # serve the production build locally
 ```
 
 Your tweaks and saved DialKit versions are stored in the browser's `localStorage`, so they survive reloads.
+
+### Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| R | Randomize |
+| E | Export |
+| D | Documentation (press again to go back) |
+| ⌘Z / Ctrl+Z | Undo |
+| ⇧⌘Z / Ctrl+Shift+Z | Redo |
 
 ## Deploying
 
@@ -51,6 +63,8 @@ src/
   docs.js          Renders the documentation snapshot in small steps
   CodeDrawer.jsx   Export drawer: code, image and Figma tabs
   figma.js         "Copy to Figma": the switch or the whole docs page as one SVG frame
+  share.js         Share links, and sanitizing any values from outside (links, storage)
+  keys.js          ⌘ / Ctrl shortcut labels
   codegen.js       HTML + CSS and React code generators
   svgExport.js     Static SVG renderer (image export and preset thumbnails)
   transitions.js   Spring / easing conversions, CSS linear() sampling
