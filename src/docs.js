@@ -47,7 +47,7 @@ function docsTasks(v) {
     v: snapshot,
     settle,
     // Small switches are drawn larger so the states are legible; big ones stay 1:1.
-    k: Math.min(2, Math.max(1, 120 / T.width)),
+    k: Math.min(2, Math.max(1, 104 / T.width)),
     shots: {},
     frames: [],
     curve: [],
@@ -63,6 +63,7 @@ function docsTasks(v) {
     ["Rendering states", () => { out.shots.offPressed = shot(false, { stretch: snapshot.Thumb.pressStretch }); }],
     ["Rendering states", () => { out.shots.onRest = shot(true); }],
     ["Rendering states", () => { out.shots.onPressed = shot(true, { stretch: snapshot.Thumb.pressStretch }); }],
+    ["Rendering states", () => { out.shots.offHover = shot(false, { hover: true }); out.shots.onHover = shot(true, { hover: true }); }],
   ];
   for (let i = 0; i < FRAMES; i++) {
     tasks.push(["Sampling motion", () => {
@@ -135,8 +136,21 @@ export function liveOnly(v) {
   ].filter(Boolean);
 }
 
+// Which pre-rendered image shows a given state.
+export const shotKey = (on, state) => `${on ? "on" : "off"}${state === "pressed" ? "Pressed" : state === "hover" ? "Hover" : "Rest"}`;
+
+export const DOC_STATES = [
+  { id: "rest", label: "Default" },
+  { id: "hover", label: "Hover" },
+  { id: "focus", label: "Focus" },
+  { id: "pressed", label: "Pressed" },
+  { id: "disabled", label: "Disabled" },
+];
+
 export function docsSpecs(v) {
   const { Track: T, Thumb: H, Icon: I, Label: L, Motion: M, Effects: E } = v;
+  const HV = v.Hover ?? { tint: 0, thumbScale: 1 };
+  const hover = [HV.tint > 0 && `tint ${Math.round(HV.tint * 100)}%`, HV.thumbScale > 1 && `thumb ×${r(HV.thumbScale)}`].filter(Boolean).join(" · ") || "none";
   const sOff = Math.max(4, H.size * H.offScale);
   const anatomy = [
     ["Track", `${T.width} × ${T.height} px`],
@@ -144,6 +158,7 @@ export function docsSpecs(v) {
     ["Padding", `${T.padding} px`],
     ["Thumb", sOff !== H.size ? `${H.size} px · ${r(sOff)} px when off` : `${H.size} px`],
     T.borderWidth > 0 && ["Border", `${T.borderWidth} px${T.borderOffOnly ? " · off only" : ""}`],
+    ["Hover", hover],
     ["Press", `scale ${r(M.pressScale)} · stretch ${r(H.pressStretch)}×`],
     ["Thumb motion", motionSummary(M.thumb)],
     ["Fill motion", motionSummary(M.fill)],
@@ -168,6 +183,7 @@ export const A11Y = [
   "A native `button` with `role=\"switch\"`; `aria-checked` carries the state.",
   "`Space` and `Enter` toggle it. Give every switch a visible label or an `aria-label`.",
   "Focus ring: 2 px, 2 px offset, shown only for keyboard focus.",
+  "Hover only applies to a mouse, so touch screens never get a stuck hover state.",
   "Disabled uses the native attribute: 50% opacity, no press feedback.",
   "With reduced motion, the thumb uses a short ease-out and effects are skipped.",
 ];

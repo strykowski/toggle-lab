@@ -210,7 +210,7 @@ const ArrowIcon = ({ flip }) => (
 );
 
 export function PresetsPanel({
-  v, onStyle, onPartial, onRandom, locks, onLock, allLocked,
+  v, onStyle, onPartial, onShape, onRandom, locks, onLock, allLocked,
   canUndo, canRedo, onUndo, onRedo, recent, currentFp, onRecent,
 }) {
   const fpAll = fingerprint(v);
@@ -295,7 +295,7 @@ export function PresetsPanel({
           label="Shape"
           options={shapeOpts}
           activeId={shapeActive}
-          onSelect={(o) => onPartial(o.vals)}
+          onSelect={(o) => onShape(o.vals)}
           renderPreview={(o, small) => (
             <PreviewBox small={small}><ShapeOutline v={o ? o.preview : v} small={small} /></PreviewBox>
           )}

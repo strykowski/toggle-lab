@@ -1,4 +1,5 @@
-import { FRAMES, docsSpecs, liveOnly, A11Y } from "./docs.js";
+import { FRAMES, docsSpecs, liveOnly, A11Y, DOC_STATES, shotKey } from "./docs.js";
+import { a11yChecks, summarize } from "./a11y.js";
 
 // Figma turns SVG markup pasted onto the canvas into editable vector layers, and uses
 // element ids as layer names. So "Copy to Figma" is SVG text on the clipboard.
@@ -62,11 +63,11 @@ function states(docs, x, y, w) {
   const tw = T.width * k, th = T.height * k;
   const rT = ((T.roundness * Math.min(T.width, T.height)) / 2) * k;
   const surfaceW = 40, labelW = 180;
-  const colW = (w - surfaceW - labelW) / 4;
+  const colW = (w - surfaceW - labelW) / DOC_STATES.length;
   const headH = 36;
   const rowH = Math.max(72, Math.max(T.height, H.size) * k + 56);
   const top = y + 64;
-  const STATES = ["Default", "Focus", "Pressed", "Disabled"];
+  const STATES = DOC_STATES.map((s) => s.label);
   const parts = [line(x, top, x + w, top, C.border)];
   parts.push(rect(x, top, surfaceW + labelW, headH + rowH * 4, `fill="${C.bg}"`));
   STATES.forEach((s, i) => parts.push(text(x + surfaceW + labelW + colW * (i + 0.5), top + headH / 2, s, { size: 12, anchor: "middle" })));
@@ -92,10 +93,11 @@ function states(docs, x, y, w) {
         const ccx = cx0 + colW / 2, ccy = ry + rowH / 2;
         const sx = ccx - tw / 2, sy = ccy - th / 2;
         const name = `${surface} / ${on ? "On" : "Off"} / ${s}`;
-        if (s === "Pressed") {
-          cells.push(`<g transform="translate(${r(ccx)} ${r(ccy)}) scale(${r(M.pressScale, 3)}) translate(${r(-ccx)} ${r(-ccy)})">${embed(shots[on ? "onPressed" : "offPressed"], sx, sy, k, name)}</g>`);
+        const id = DOC_STATES[i].id;
+        if (id === "pressed") {
+          cells.push(`<g transform="translate(${r(ccx)} ${r(ccy)}) scale(${r(M.pressScale, 3)}) translate(${r(-ccx)} ${r(-ccy)})">${embed(shots[shotKey(on, id)], sx, sy, k, name)}</g>`);
         } else {
-          const sw = embed(shots[on ? "onRest" : "offRest"], sx, sy, k, name);
+          const sw = embed(shots[shotKey(on, id)], sx, sy, k, name);
           if (s === "Disabled") cells.push(`<g opacity="0.5">${sw}</g>`);
           else cells.push(sw);
           if (s === "Focus") {
@@ -160,13 +162,33 @@ function list(x, y, w, id, title, rows, swatches = false) {
   return { h, svg: card(x, y, w, h, id, parts.join(""), { title }) };
 }
 
-function a11y(x, y, w) {
-  const parts = A11Y.map((s, i) => {
-    const cy = y + 52 + i * 24;
-    return `<circle cx="${x + 24}" cy="${cy}" r="2" fill="${C.muted}"/>` + text(x + 36, cy, s.replaceAll("`", ""), { size: 13 });
+const PILL = { pass: ["Pass", "#e6f6ec", "#0a7a36"], fail: ["Fail", "#fde8e8", "#c4161c"], warn: ["Check", "#fdf3dc", "#9a5b00"] };
+
+function a11y(docs, x, y, w) {
+  const checks = a11yChecks(docs.v, ["light", "dark"]);
+  const { fail, warn } = summarize(checks);
+  const parts = [];
+  const top = y + 64;
+  let ry = top;
+  for (const c of checks) {
+    const rh = c.detail ? 50 : 36;
+    parts.push(line(x + 20, ry, x + w - 20, ry, C.border));
+    parts.push(text(x + 20, ry + 18, c.label, { size: 13, fill: C.text }));
+    if (c.detail) parts.push(text(x + 20, ry + 36, c.detail, { size: 12, fill: C.faint }));
+    parts.push(text(x + w - 200, ry + 18, c.criterion, { size: 12, mono: true }));
+    parts.push(text(x + w - 90, ry + 18, c.value, { size: 12, mono: true, fill: C.text, anchor: "end" }));
+    const [label, bg, fg] = PILL[c.status];
+    parts.push(`<g id="${esc(c.label)}: ${label}">${rect(x + w - 74, ry + 8, 54, 20, `rx="10" fill="${bg}"`)}${text(x + w - 47, ry + 18, label, { size: 11, weight: 600, fill: fg, anchor: "middle" })}</g>`);
+    ry += rh;
+  }
+  const notesTop = ry + 16;
+  A11Y.forEach((s, i) => {
+    const cy = notesTop + 8 + i * 24;
+    parts.push(`<circle cx="${x + 24}" cy="${cy}" r="2" fill="${C.muted}"/>` + text(x + 36, cy, s.replaceAll("`", ""), { size: 13 }));
   });
-  const h = 52 + A11Y.length * 24 + 8;
-  return { h, svg: card(x, y, w, h, "Accessibility", parts.join(""), { title: "Accessibility" }) };
+  const h = notesTop - y + A11Y.length * 24 + 12;
+  const summary = !fail && !warn ? "All checks pass" : [fail && `${fail} ${fail === 1 ? "issue" : "issues"}`, warn && `${warn} to check`].filter(Boolean).join(", ");
+  return { h, svg: card(x, y, w, h, "Accessibility", parts.join(""), { title: "Accessibility", desc: `WCAG 2.2 AA: non-text contrast (1.4.11) and target size (2.5.8). ${summary}.` }) };
 }
 
 // The whole docs page as one SVG frame.
@@ -191,7 +213,7 @@ export function docsSvg(docs, name) {
   const c = list(P + half + 16, y, half, "Color", "Color", tokens, true);
   out.push(a.svg, c.svg);
   y += Math.max(a.h, c.h) + 16;
-  const ax = a11y(P, y, w);
+  const ax = a11y(docs, P, y, w);
   out.push(ax.svg);
   y += ax.h + P;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${FW}" height="${r(y)}" viewBox="0 0 ${FW} ${r(y)}" fill="none">`

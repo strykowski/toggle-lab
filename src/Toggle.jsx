@@ -10,6 +10,7 @@ import {
 } from "motion/react";
 import { toMotion, scaleTime } from "./transitions.js";
 import { Glyph } from "./glyphs.jsx";
+import { hoverTint } from "./color.js";
 
 const mix = (c, a) => `color-mix(in srgb, ${c} ${Math.round(Math.max(0, Math.min(1, a)) * 100)}%, transparent)`;
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
@@ -20,6 +21,7 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   const reduceMotion = useReducedMotion();
   const quiet = preview || reduceMotion;
   const { Track: T, Thumb: H, Icon: I, Label: L, Depth: D, Motion: M, Effects: E } = v;
+  const HV = v.Hover ?? { tint: 0, thumbScale: 1 };
 
   // ---- geometry ----
   const W = T.width;
@@ -32,6 +34,7 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   const rTrack = (T.roundness * Math.min(W, HT)) / 2;
 
   const [pressed, setPressed] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [settle, setSettle] = useState(0);
   const drag = useRef(null);
   const suppressClick = useRef(false);
@@ -49,6 +52,7 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   const w = useMotionValue(tw);
   const h = useMotionValue(size);
   const rad = useMotionValue(rThumb);
+  const hoverS = useMotionValue(1);
   const popX = useMotionValue(1);
   const popY = useMotionValue(1);
   const y = useTransform(() => -h.get() / 2);
@@ -82,13 +86,20 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   const sx = useTransform(() => {
     const p = params.current;
     const n = Math.min((Math.abs(vel.get()) * p.slow) / (p.dist * 7 + 1), 1);
-    return 1 + n * p.squash;
+    return (1 + n * p.squash) * hoverS.get();
   });
   const sy = useTransform(() => {
     const p = params.current;
     const n = Math.min((Math.abs(vel.get()) * p.slow) / (p.dist * 7 + 1), 1);
-    return 1 - n * p.squash * 0.55;
+    return (1 - n * p.squash * 0.55) * hoverS.get();
   });
+
+  // Hover: mouse only, so touch screens don't get a stuck hover state.
+  const hoverOn = hovered && !preview;
+  useEffect(() => {
+    animate(hoverS, hoverOn ? HV.thumbScale : 1, reduceMotion ? { duration: 0 } : { type: "spring", visualDuration: 0.2 * slow, bounce: 0.3 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoverOn, HV.thumbScale]);
 
   const mounted = useRef(false);
   useEffect(() => {
@@ -177,6 +188,8 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   }, [checked]);
 
   // ---- pointer: press-stretch, drag to toggle ----
+  const onPointerEnter = (e) => { if (!preview && e.pointerType === "mouse") setHovered(true); };
+  const onPointerLeave = () => setHovered(false);
   const onPointerDown = (e) => {
     if (preview || e.button !== 0) return;
     setPressed(true);
@@ -250,6 +263,8 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
       style={{ width: W, height: HT, borderRadius: rTrack }}
       whileTap={quiet ? undefined : { scale: M.pressScale }}
       transition={{ type: "spring", visualDuration: 0.18 * slow, bounce: 0.35 }}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer(true)}
@@ -310,6 +325,15 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
               style={{
                 background: `linear-gradient(180deg, rgba(255,255,255,${0.6 * T.sheen}) 0%, rgba(255,255,255,${0.12 * T.sheen}) 48%, rgba(255,255,255,0) 52%, rgba(0,0,0,${0.06 * T.sheen}) 100%)`,
               }}
+            />
+          )}
+          {HV.tint > 0 && (
+            <motion.span
+              className="tg-layer"
+              style={{ background: hoverTint(checked ? T.onColor : T.offColor, HV.tint) }}
+              initial={false}
+              animate={{ opacity: hoverOn ? 1 : 0 }}
+              transition={{ duration: 0.15 * slow, ease: "easeOut" }}
             />
           )}
           {L.show && (

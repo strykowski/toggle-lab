@@ -1,4 +1,5 @@
 import { GLYPHS } from "./glyphs.jsx";
+import { hoverTint } from "./color.js";
 
 const r = (n) => Math.round(n * 100) / 100;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -6,7 +7,8 @@ let uid = 0;
 
 // Render the switch in one state as a standalone SVG string.
 // `frame` draws in-between states for the docs: progress (thumb position, 0 = off, 1 = on,
-// may overshoot), fill (on-color opacity 0..1) and stretch (pressed thumb width factor).
+// may overshoot), fill (on-color opacity 0..1), stretch (pressed thumb width factor) and
+// hover (track tint and thumb scale from the Hover settings).
 export function switchSvg(v, checked = true, frame = {}) {
   const { Track: T, Thumb: H, Icon: I, Label: L, Depth: D, Effects: E } = v;
   const id = `s${++uid}`;
@@ -14,8 +16,9 @@ export function switchSvg(v, checked = true, frame = {}) {
   const p = frame.progress ?? (checked ? 1 : 0);
   const f = Math.max(0, Math.min(1, frame.fill ?? (checked ? 1 : 0)));
   const on = f >= 0.5; // which label, icon and border state to show
+  const HV = v.Hover ?? { tint: 0, thumbScale: 1 };
   const sOff = Math.max(4, S * H.offScale);
-  const size = sOff + (S - sOff) * Math.max(0, Math.min(1, p));
+  const size = (sOff + (S - sOff) * Math.max(0, Math.min(1, p))) * (frame.hover ? HV.thumbScale : 1);
   const tw = size * (frame.stretch ?? 1);
   const offC = pad + S / 2, onC = W - pad - S / 2;
   // A pressed thumb stretches toward the middle, anchored at its resting side.
@@ -75,6 +78,10 @@ export function switchSvg(v, checked = true, frame = {}) {
   if (T.sheen > 0) {
     defs.push(`<linearGradient id="${id}-sheen" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="${r(0.6 * T.sheen)}"/><stop offset=".48" stop-color="#fff" stop-opacity="${r(0.12 * T.sheen)}"/><stop offset=".52" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="${r(0.06 * T.sheen)}"/></linearGradient>`);
     body.push(trackRect(`fill="url(#${id}-sheen)"`));
+  }
+  if (frame.hover && HV.tint > 0) {
+    const [rgb, alpha] = hoverTint(on ? T.onColor : T.offColor, HV.tint).match(/rgba\((\d+, \d+, \d+), ([\d.]+)\)/).slice(1);
+    body.push(trackRect(`fill="rgb(${rgb})" fill-opacity="${alpha}"`));
   }
   if (L.show) {
     const font = L.font === "mono" ? "Geist Mono, ui-monospace, Menlo, monospace" : "Geist, system-ui, -apple-system, Segoe UI, sans-serif";

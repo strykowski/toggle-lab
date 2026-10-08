@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { generateDocs, FRAMES, docsSpecs, liveOnly, A11Y } from "./docs.js";
+import { generateDocs, FRAMES, docsSpecs, liveOnly, A11Y, DOC_STATES as STATES, shotKey } from "./docs.js";
+import { a11yChecks, summarize } from "./a11y.js";
+import { ChecksTable, summaryText } from "./A11yChecks.jsx";
 import { fingerprint } from "./presets.js";
 import { docsSvg, copyToFigma } from "./figma.js";
 import { FigmaIcon } from "./glyphs.jsx";
@@ -9,12 +11,6 @@ const r = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 const SURFACES = [
   { id: "light", label: "Light" },
   { id: "dark", label: "Dark" },
-];
-const STATES = [
-  { id: "rest", label: "Default" },
-  { id: "focus", label: "Focus" },
-  { id: "pressed", label: "Pressed" },
-  { id: "disabled", label: "Disabled" },
 ];
 
 // A pre-rendered switch image, positioned so its box is exactly the track.
@@ -62,7 +58,7 @@ function States({ docs }) {
         <p>Every state the exported code supports, on light and dark surfaces.</p>
       </div>
       <div className="docs-scroll">
-        <table className="docs-table" style={{ "--cell": `${Math.max(96, v.Track.width * docs.k + 48)}px` }}>
+        <table className="docs-table" style={{ "--cell": `${Math.max(88, v.Track.width * docs.k + 24)}px` }}>
           <thead>
             <tr>
               <th colSpan={2} className="docs-corner" />
@@ -80,7 +76,7 @@ function States({ docs }) {
                   </th>
                   {STATES.map((st) => (
                     <td key={st.id} className={`docs-cell is-${s.id}`}>
-                      <Shot shot={shots[`${on ? "on" : "off"}${st.id === "pressed" ? "Pressed" : "Rest"}`]} docs={docs} state={st.id} />
+                      <Shot shot={shots[shotKey(on, st.id)]} docs={docs} state={st.id} />
                     </td>
                   ))}
                 </tr>
@@ -142,6 +138,8 @@ function Motion({ docs }) {
 
 function Specs({ docs }) {
   const { anatomy, tokens } = docsSpecs(docs.v);
+  const checks = a11yChecks(docs.v, ["light", "dark"]);
+  const sum = summarize(checks);
 
   return (
     <div className="docs-specs">
@@ -165,7 +163,14 @@ function Specs({ docs }) {
         </dl>
       </section>
       <section className="docs-card" aria-labelledby="docs-a11y">
-        <div className="docs-card-head"><h3 id="docs-a11y">Accessibility</h3></div>
+        <div className="docs-card-head docs-card-head-row">
+          <div>
+            <h3 id="docs-a11y">Accessibility</h3>
+            <p>WCAG 2.2 AA: non-text contrast (1.4.11) and target size (2.5.8), on light and dark surfaces.</p>
+          </div>
+          <span className={`a11y-summary is-${sum.fail ? "fail" : sum.warn ? "warn" : "pass"}`}>{summaryText(sum)}</span>
+        </div>
+        <ChecksTable checks={checks} />
         <ul className="docs-a11y">
           {A11Y.map((line) => (
             <li key={line}>{line.split("`").map((part, i) => (i % 2 ? <code key={i}>{part}</code> : part))}</li>

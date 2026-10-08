@@ -8,6 +8,8 @@ import { PresetsPanel, Listbox } from "./Presets.jsx";
 import { SCENES, SceneCtx, SceneIcon } from "./scenes.jsx";
 import { CodeDrawer } from "./CodeDrawer.jsx";
 import { MOD } from "./keys.js";
+import { a11yChecks, summarize, SURFACES } from "./a11y.js";
+import { ChecksTable, summaryText } from "./A11yChecks.jsx";
 import { sanitize, STAGES, encodeShare, decodeShare, shareUrl, readShareHash } from "./share.js";
 
 // Loaded on first visit to the Documentation view.
@@ -295,6 +297,28 @@ export default function App() {
     }
   };
 
+  // ---- Shape picks keep the inside label legible ----
+  // Shrink the label to fit a narrow shape, and grow it back to the size you chose on a wider one.
+  const labelPref = useRef(v.Label.size);
+  const autoLabel = useRef(null);
+  useEffect(() => {
+    if (v.Label.size !== autoLabel.current) labelPref.current = v.Label.size;
+  }, [v.Label.size]);
+  const applyShape = (vals) => {
+    const next = overlay(v, vals);
+    if (!next.Label.show) { dial.setValues(vals); return; }
+    const want = Math.max(labelPref.current, next.Label.size);
+    const fitted = fitLabel(overlay(next, { Label: { size: want } }));
+    if (fitted) {
+      autoLabel.current = fitted.Label.size;
+      dial.setValues({ ...vals, Label: { size: fitted.Label.size } });
+      if (fitted.Label.size < want) showToast(`Label shrunk to ${fitted.Label.size} px to fit this shape`);
+    } else {
+      dial.setValues(vals);
+      showToast("The label doesn't fit this shape. Try a wider one or shorter text.");
+    }
+  };
+
   const toggleDocs = () => {
     if (scene === "docs") setScene(prevScene.current === "docs" ? "canvas" : prevScene.current);
     else { prevScene.current = scene; setScene("docs"); }
@@ -489,7 +513,10 @@ export default function App() {
           </div>
 
           {!isDocs && <div className="stage-footer">
-            {graph && <Trace trace={trace} slow={slow} settle={settle} />}
+            <div className="stage-footer-left">
+              {isCanvas && <A11yBadge v={v} stage={bg} onDocs={toggleDocs} />}
+              {graph && <Trace trace={trace} slow={slow} settle={settle} />}
+            </div>
             <p className="stage-hint">
               {reduceMotion
                 ? "Reduced motion is on, so trail, bursts, and squash are paused."
@@ -504,6 +531,7 @@ export default function App() {
           v={v}
           onStyle={applyStyle}
           onPartial={(partial) => dial.setValues(partial)}
+          onShape={applyShape}
           onRandom={randomize}
           locks={locks}
           onLock={(key) => setLocks((l) => ({ ...l, [key]: !l[key] }))}
@@ -537,6 +565,40 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+// WCAG checks for the switch on the current canvas background.
+function A11yBadge({ v, stage, onDocs }) {
+  const checks = useMemo(() => a11yChecks(v, [stage]), [v, stage]);
+  const sum = summarize(checks);
+  const status = sum.fail ? "fail" : sum.warn ? "warn" : "pass";
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  return (
+    <div className="a11y-badge-wrap" ref={ref}>
+      {open && (
+        <div className="a11y-pop" role="dialog" aria-label="Accessibility checks">
+          <p className="a11y-pop-head">WCAG 2.2 AA on {SURFACES[stage].label}</p>
+          <ChecksTable checks={checks} />
+          <button type="button" className="a11y-pop-link" onClick={() => { setOpen(false); onDocs(); }}>
+            Full report in Documentation (D)
+          </button>
+        </div>
+      )}
+      <button type="button" className={`a11y-badge is-${status}`} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>
+        <span className="a11y-dot" aria-hidden="true" />
+        A11y · {summaryText(sum)}
+      </button>
     </div>
   );
 }

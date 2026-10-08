@@ -15,7 +15,8 @@ A playground for designing switch components. Shape it, color it, tune its motio
 - **Explore freely.** Hit **Randomize** (or press **R**) for a new mix, lock style, color or shape to keep them, and click back through recent results. Every change can be undone with **⌘Z** / **Ctrl+Z**.
 - **Share it.** **Share** copies a link that opens your exact switch for anyone, no account needed.
 - **See it in context.** Swap the plain canvas for real scenes: a phone settings screen, a dashboard, a pricing page where the toggle flips the prices, a sign-in form, a site navbar with a working theme switch, a smart-home panel and a sci-fi cockpit.
-- **Document it.** The Documentation view generates a spec sheet for the current switch: every state (default, focus, pressed, disabled) on light and dark surfaces, a filmstrip of the off-to-on motion, and its dimensions and colors. It's a snapshot, so it only regenerates when you ask.
+- **Check accessibility.** A badge on the canvas checks WCAG 2.2 AA as you design: 3:1 non-text contrast for thumb vs track and track vs background (1.4.11), and 24 px target size (2.5.8). The docs carry the full report.
+- **Document it.** The Documentation view generates a spec sheet for the current switch: every state (default, hover, focus, pressed, disabled) on light and dark surfaces, a filmstrip of the off-to-on motion, and its dimensions and colors. It's a snapshot, so it only regenerates when you ask.
 - **Study the motion.** Slow it down to ½× or ¼×, loop it, and watch a live graph of the thumb's position to see overshoot and settle time.
 - **Take it with you.** Get HTML + CSS (springs are sampled into CSS `linear()` curves), a React + Motion component, an SVG / PNG at 1×, 2× or 3×, or copy it to Figma as editable layers: the switch alone or the whole documentation page.
 
@@ -63,6 +64,8 @@ src/
   docs.js          Renders the documentation snapshot in small steps
   CodeDrawer.jsx   Export drawer: code, image and Figma tabs
   figma.js         "Copy to Figma": the switch or the whole docs page as one SVG frame
+  a11y.js          WCAG contrast and target-size checks (A11yChecks.jsx renders them)
+  color.js         Hex parsing, alpha compositing, contrast ratio, hover tint
   share.js         Share links, and sanitizing any values from outside (links, storage)
   keys.js          ⌘ / Ctrl shortcut labels
   codegen.js       HTML + CSS and React code generators

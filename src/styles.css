@@ -309,6 +309,44 @@ button { font: inherit; color: inherit; }
 .recent-item[aria-current="true"] .select-preview { box-shadow: 0 0 0 1.5px var(--text); }
 @media (hover: hover) and (pointer: fine) { .recent-item:hover .select-preview { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2); } }
 
+/* ---------- accessibility checks ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.a11y-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.a11y-table td { padding: 8px 0; border-top: 1px solid var(--border); vertical-align: top; }
+.a11y-table td + td { padding-left: 12px; white-space: nowrap; }
+.a11y-detail { display: block; margin-top: 2px; font-size: 12px; color: var(--faint); }
+.a11y-crit { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.a11y-value { font-family: var(--mono); font-size: 12px; text-align: right; }
+.a11y-pill { display: inline-block; min-width: 46px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-align: center; }
+.a11y-pill.is-pass, .a11y-summary.is-pass { background: #e6f6ec; color: #0a7a36; }
+.a11y-pill.is-fail, .a11y-summary.is-fail { background: #fde8e8; color: #c4161c; }
+.a11y-pill.is-warn, .a11y-summary.is-warn { background: #fdf3dc; color: #9a5b00; }
+.a11y-summary { flex: none; font-size: 12px; font-weight: 500; padding: 2px 10px; border-radius: 999px; }
+.docs-card-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.docs-card .a11y-table { margin: 0 20px; width: calc(100% - 40px); }
+.docs-card .a11y-table + .docs-a11y { margin-top: 14px; }
+
+.stage-footer-left { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.a11y-badge-wrap { position: relative; }
+.a11y-badge {
+  display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px;
+  border: 0; border-radius: 8px; background: #fff; color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.a11y-dot { width: 7px; height: 7px; border-radius: 50%; }
+.a11y-badge.is-pass .a11y-dot { background: #00ac3a; box-shadow: 0 0 0 3px rgba(0, 172, 58, 0.16); }
+.a11y-badge.is-fail .a11y-dot { background: #e5484d; box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.16); }
+.a11y-badge.is-warn .a11y-dot { background: #f5a623; box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18); }
+.a11y-pop {
+  position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 5; width: min(420px, calc(100vw - 48px));
+  padding: 12px 14px 10px; border-radius: 12px; background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 12px 32px -8px rgba(0, 0, 0, 0.18);
+  animation: select-in 160ms var(--ease-out); transform-origin: bottom left;
+}
+.a11y-pop-head { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+.a11y-pop .a11y-table { font-size: 12px; }
+.a11y-pop-link { margin-top: 6px; padding: 4px 0; border: 0; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
+
 /* ---------- toast ---------- */
 .toast-region { position: fixed; left: 0; right: 0; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 80; display: flex; justify-content: center; pointer-events: none; }
 .toast {
@@ -645,7 +683,7 @@ button { font: inherit; color: inherit; }
 .docs-table tbody th span { display: block; font-size: 13px; color: var(--text); }
 .docs-table tbody th code { font-family: var(--mono); font-size: 11px; color: var(--faint); }
 .docs-cell {
-  min-width: var(--cell); padding: 28px 16px;
+  min-width: var(--cell); padding: 26px 8px;
   border-top: 1px solid var(--border); border-left: 1px solid var(--border);
   vertical-align: middle;
 }

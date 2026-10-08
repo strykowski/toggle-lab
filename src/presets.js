@@ -79,6 +79,12 @@ export const CONFIG = {
     color: "#000000",
     opacity: [0.15, 0, 1, 0.01],
   },
+  Hover: {
+    _collapsed: true,
+    // Darkens light tracks and lightens dark ones; mouse only.
+    tint: [0.06, 0, 0.3, 0.01],
+    thumbScale: [1, 1, 1.2, 0.01],
+  },
   Motion: {
     thumb: { type: "spring", visualDuration: 0.3, bounce: 0.15 },
     fill: { type: "easing", duration: 0.2, ease: [0.23, 1, 0.32, 1] },
@@ -189,6 +195,7 @@ export const PRESETS = [
       thumb: { type: "spring", visualDuration: 0.5, bounce: 0.55 },
       pressScale: 0.92, squash: 0.4, pop: 0.12,
     },
+    Hover: { thumbScale: 1.06 },
     Effects: { color: "#ff4d94", burst: "confetti" },
   }),
   preset("brutal", "Brutal", "paper", {
@@ -242,6 +249,7 @@ export const PRESETS = [
     },
     Thumb: { size: 30, offColor: "#f8fafc", onColor: "#f8fafc", shadow: 0.8, gloss: 0.9 },
     Motion: { thumb: { type: "spring", visualDuration: 0.38, bounce: 0.3 }, squash: 0.15 },
+    Hover: { thumbScale: 1.04 },
     Effects: { color: "#3b82f6", glow: 10 },
   }),
   preset("overhang", "Overhang", "paper", {
@@ -307,6 +315,7 @@ export const PRESETS = [
     Track: { width: 80, height: 36, padding: 4, offColor: "#1f1033", onColor: "#7c3aed" },
     Thumb: { size: 28, offColor: "#d8b4fe", onColor: "#fdf4ff", shadow: 0.4, gloss: 0.5, pressStretch: 1.3 },
     Motion: { thumb: { type: "spring", visualDuration: 0.55, bounce: 0.5 }, squash: 0.35, pop: 0.06 },
+    Hover: { thumbScale: 1.05 },
     Effects: { color: "#d946ef", finish: "plasma", glow: 26, burst: "ripple", trail: 4 },
   }),
   wild("chrome", "Chrome", "mist", {
