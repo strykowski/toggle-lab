@@ -11,7 +11,7 @@ A playground for designing switch components. Shape it, color it, tune its motio
 ## What it does
 
 - **Tune everything live.** Around 50 controls in a [DialKit](https://github.com/joshpuckett/dialkit) panel: track and thumb geometry, colors, borders, depth, springs and easing curves, squash and stretch, glow, trails, bursts, surface finishes, 3D tilt and stepped motion.
-- **Start from presets.** 26 styles, from familiar (Cupertino, Material, Brutal) to experimental (FUI, Holographic, Lightsaber, Pixel, Plasma) and live WebGL shader finishes (Foil, Mercury, Borealis, Film, 1-bit). Color and shape presets apply on their own, so you can mix them with any style, or hit **Randomize**.
+- **Start from presets.** 27 styles, from familiar (Cupertino, Material, Brutal) to experimental (FUI, Holographic, Lightsaber, Pixel, Plasma) and live WebGL shader finishes (Sky, Foil, Mercury, Borealis, Film, 1-bit). Sky turns a sunny day with drifting clouds into a starry night as the sun becomes the moon. Color and shape presets apply on their own, so you can mix them with any style, or hit **Randomize**.
 - **Set the mood.** Four macro sliders, Soft ↔ Sharp, Calm ↔ Energetic, Flat ↔ Deep and Serious ↔ Playful, each move a whole set of controls at once.
 - **Throw it.** Flick the thumb: release speed decides the side, and the momentum carries into the spring.
 - **Explore freely.** Hit **Randomize** (or press **R**) for a new mix, lock style, color or shape to keep them, and click back through recent results. Every change can be undone with **⌘Z** / **Ctrl+Z**.
@@ -20,6 +20,7 @@ A playground for designing switch components. Shape it, color it, tune its motio
 - **Check accessibility.** A badge on the canvas checks WCAG 2.2 AA as you design: 3:1 non-text contrast for thumb vs track and track vs background (1.4.11), and 24 px target size (2.5.8). The docs carry the full report.
 - **Document it.** The Documentation view generates a spec sheet for the current switch: every state (default, hover, focus, pressed, disabled) on light and dark surfaces, a filmstrip of the off-to-on motion, and its dimensions and colors. It's a snapshot, so it only regenerates when you ask.
 - **Study the motion.** Slow it down to ½× or ¼×, loop it, and watch a live graph of the thumb's position to see overshoot and settle time.
+- **Watch what's possible.** Open the menu on the **Toggle Lab** wordmark and switch to **Toggle Preview**. It has three modes: a **Showreel** that morphs from preset to preset on autoplay, a **Gallery** of every preset flipping in waves (click empty space to send a ripple), and a **Switch wall** where hundreds of your current switch spell out text, a clock, waves, rain and the Game of Life. Move the cursor over the wall to ripple it, or drag to paint. Any preset in the Showreel or Gallery opens in the Lab with one click.
 - **Take it with you.** Get HTML + CSS (springs are sampled into CSS `linear()` curves), a React + Motion component, an SVG / PNG at 1×, 2× or 3×, or copy it to Figma as editable layers: the switch alone or the whole documentation page.
 
 ## Getting started
@@ -44,6 +45,8 @@ Your tweaks and saved DialKit versions are stored in the browser's `localStorage
 | D | Documentation (press again to go back) |
 | ⌘Z / Ctrl+Z | Undo |
 | ⇧⌘Z / Ctrl+Shift+Z | Redo |
+| ← / → | Showreel: previous / next preset |
+| Space | Showreel: pause / play |
 
 ## Deploying
 
@@ -57,7 +60,8 @@ The build is a static site in `dist/`, with relative asset paths so it works fro
 
 ```
 src/
-  App.jsx          App shell: top bar, stage, toolbar, sidebar
+  App.jsx          App shell: top bar, stage, toolbar, sidebar; switches between Lab and Preview
+  Brand.jsx        Logo switch and the Toggle Lab / Toggle Preview menu
   Toggle.jsx       The live switch: all motion, effects and interaction
   presets.js       DialKit control config, style / color / shape presets
   Presets.jsx      Sidebar preset dropdowns, randomizer, generic listbox
@@ -69,6 +73,7 @@ src/
   a11y.js          WCAG contrast and target-size checks (A11yChecks.jsx renders them)
   color.js         Hex parsing, alpha compositing, contrast ratio, hover tint, saturation
   mood.js          Mood slider mappings (Mood.jsx is the panel)
+  morph.js         Blends two designs (numbers and colors) for the showreel's morphs
   shaders.js       WebGL shader finishes on one shared context (ShaderLayer.jsx draws a layer)
   share.js         Share links, and sanitizing any values from outside (links, storage)
   keys.js          ⌘ / Ctrl shortcut labels
@@ -77,6 +82,7 @@ src/
   transitions.js   Spring / easing conversions, CSS linear() sampling
   glyphs.jsx       Thumb icons
   styles.css       All styles
+  preview/         Toggle Preview: Showreel, Gallery, Switch wall (Wall.jsx) and its 5×7 pixel font
 ```
 
 ## Adding a preset

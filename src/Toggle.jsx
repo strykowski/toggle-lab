@@ -206,9 +206,11 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
     animate(fillP, checked ? 1 : 0, fillT);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checked, preview]);
-  const getFill = () => (T.fillMode === "grow"
-    ? { on: growO.get(), growX: W > 0 ? growW.get() / W : 0 }
-    : { on: fillP.get(), growX: -1 });
+  const getFill = () => ({
+    ...(T.fillMode === "grow" ? { on: growO.get(), growX: W > 0 ? growW.get() / W : 0 } : { on: fillP.get(), growX: -1 }),
+    thumbX: W > 0 ? cx.get() / W : 0.5,
+    thumbR: HT > 0 ? h.get() / 2 / HT : 0.4,
+  });
 
   // ---- pointer: press-stretch, drag to toggle ----
   const onPointerEnter = (e) => { if (!preview && e.pointerType === "mouse") setHovered(true); };
@@ -447,6 +449,14 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
           )}
           {(E.finish === "holographic" || E.finish === "chrome") && (
             <span className={`tg-layer fin-${E.finish} fin-thumb`} />
+          )}
+          {E.finish === "sky" && (
+            <motion.span
+              className="tg-layer fin-craters"
+              initial={false}
+              animate={{ opacity: checked ? 1 : 0 }}
+              transition={fillT}
+            />
           )}
           {I.glyph !== "none" && ["off", "on"].map((state) => (
             <motion.span

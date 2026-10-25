@@ -109,6 +109,7 @@ export const CONFIG = {
         { value: "aurora", label: "Aurora (shader)" },
         { value: "grain", label: "Film grain (shader)" },
         { value: "dither", label: "1-bit dither (shader)" },
+        { value: "sky", label: "Day/night sky (shader)" },
       ],
       default: "none",
     },
@@ -367,6 +368,12 @@ export const PRESETS = [
     Thumb: { size: 24, offColor: "#f5f0e6", onColor: "#fff7ed", shadow: 0.45, pressStretch: 1.15 },
     Motion: { thumb: { type: "spring", visualDuration: 0.35, bounce: 0.1 }, squash: 0.05 },
     Effects: { color: "#c2410c", finish: "grain" },
+  }),
+  wild("sky", "Sky", "mist", {
+    Track: { width: 88, height: 40, padding: 4, offColor: "#5fb4ef", onColor: "#151838", inset: 0.25 },
+    Thumb: { size: 32, offColor: "#ffd43b", onColor: "#e8e6df", shadow: 0.55, gloss: 0.25, pressStretch: 1.15 },
+    Motion: { thumb: { type: "spring", visualDuration: 0.6, bounce: 0.2 }, squash: 0.1 },
+    Effects: { color: "#ffd43b", finish: "sky" },
   }),
   wild("onebit", "1-bit", "paper", {
     Track: { width: 64, height: 32, roundness: 0, padding: 4, offColor: "#e5e5e5", onColor: "#111111", borderWidth: 2, borderColor: "#111111" },

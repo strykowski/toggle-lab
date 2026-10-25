@@ -2,7 +2,7 @@
 // and copies the result into that layer's own 2D canvas. Sharing one context keeps scenes
 // with many switches well under the browser's WebGL context limit.
 
-export const SHADER_FINISHES = ["iridescent", "liquid-metal", "aurora", "grain", "dither"];
+export const SHADER_FINISHES = ["iridescent", "liquid-metal", "aurora", "grain", "dither", "sky"];
 export const isShaderFinish = (f) => SHADER_FINISHES.includes(f);
 
 const VERT = `attribute vec2 a;
@@ -27,6 +27,8 @@ uniform float u_growX;  // grow-fill edge in uv, or -1 for a crossfade fill
 uniform vec4 u_off;
 uniform vec4 u_onc;
 uniform vec3 u_accent;
+uniform float u_thumbX; // thumb center, 0..1 across the track
+uniform float u_thumbR; // thumb radius, in track heights
 
 float hash(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float noise(vec2 p) {
@@ -89,6 +91,62 @@ const FRAG = {
   vec3 col = b.rgb + g * 0.2;
   col *= 0.9 + 0.1 * smoothstep(0.95, 0.2, length((uv - 0.5) * vec2(1.0, 1.6)));
   gl_FragColor = vec4(col, b.a);
+}`,
+  // Day ↔ night sky: drifting clouds and halo rings around the sun by day; at night the
+  // clouds sink below the horizon, stars slide in and twinkle, and a shooting star passes.
+  sky: `float puffs(vec2 p, float speed, float seed, float y0) {
+  float m = 0.0;
+  for (int i = 0; i < 7; i++) {
+    float fi = float(i);
+    float x = mod(fi * 0.55 + seed + u_time * speed, 4.2) - 0.5;
+    float y = y0 + 0.12 * sin(fi * 1.7 + seed);
+    float r = 0.22 + 0.12 * hash(vec2(fi, seed));
+    m = max(m, smoothstep(r, r - 0.025, length(p - vec2(x, y))));
+  }
+  return m;
+}
+float stars(vec2 p) {
+  vec2 g = p * 9.0;
+  vec2 id = floor(g), f = fract(g) - 0.5;
+  float h = hash(id);
+  vec2 o = (vec2(hash(id + 7.1), hash(id + 3.7)) - 0.5) * 0.7;
+  float d = length(f - o);
+  float tw = 0.55 + 0.45 * sin(u_time * (1.5 + h * 3.0) + h * 40.0);
+  float star = smoothstep(0.04 + 0.05 * hash(id + 1.9), 0.0, d) * step(0.7, h);
+  float glint = step(0.94, h) * (smoothstep(0.025, 0.0, abs(f.x - o.x)) + smoothstep(0.025, 0.0, abs(f.y - o.y))) * smoothstep(0.32, 0.0, d);
+  return (star + glint * 0.6) * tw;
+}
+void main() {
+  vec2 uv = v_uv; float f = fill(); float asp = u_res.x / u_res.y;
+  vec2 p = vec2(uv.x * asp, uv.y);
+  float dusk = sin(3.14159 * f);
+  vec3 day = u_off.rgb, night = u_onc.rgb;
+  vec3 col = mix(mix(day * 0.92 + 0.04, mix(day, vec3(1.0), 0.3), uv.y),
+                 mix(night * 0.7, night * 1.2 + vec3(0.03, 0.03, 0.09), uv.y), f);
+  col = mix(col, vec3(1.0, 0.56, 0.38), dusk * 0.5 * smoothstep(0.25, 1.0, uv.y));
+  // Halo rings around the sun (the thumb), fading at night.
+  float d = length(p - vec2(u_thumbX * asp, 0.5));
+  float r = u_thumbR, aa = 0.012;
+  float rings = smoothstep(r * 1.55 + aa, r * 1.55, d) * 0.12 + smoothstep(r * 2.1 + aa, r * 2.1, d) * 0.09 + smoothstep(r * 2.7 + aa, r * 2.7, d) * 0.06;
+  col = mix(col, vec3(1.0), rings * (1.0 - 0.5 * f));
+  // Stars slide down into view as night falls.
+  col += stars(p + vec2(u_time * 0.004, (1.0 - f) * 0.9)) * smoothstep(0.15, 0.9, f) * vec3(1.0, 0.97, 0.9);
+  // A shooting star every few seconds, at night only.
+  float cyc = fract(u_time / 6.0 + 0.3);
+  if (cyc < 0.15) {
+    float k = cyc / 0.15;
+    vec2 dir = normalize(vec2(1.0, 0.45));
+    vec2 q = p - vec2((0.15 + 0.9 * k) * asp, 0.12 + 0.35 * k);
+    float along = dot(q, -dir), across = abs(q.x * dir.y - q.y * dir.x);
+    col += step(0.0, along) * smoothstep(0.5, 0.0, along) * smoothstep(0.014, 0.0, across) * (1.0 - k) * smoothstep(0.6, 1.0, f);
+  }
+  // Clouds drift by day and sink below the horizon at night.
+  vec3 cloudCol = mix(vec3(1.0), vec3(1.0, 0.82, 0.76), dusk);
+  float back = puffs(p, 0.02, 1.3, 0.8 + f * 0.95);
+  float front = puffs(p, 0.035, 0.0, 0.97 + f * 0.95);
+  col = mix(col, mix(col, cloudCol, 0.75), back);
+  col = mix(col, cloudCol, front);
+  gl_FragColor = vec4(col, mix(u_off.a, u_onc.a, f));
 }`,
   // 1-bit ordered (Bayer) dither: the fill sweeps across in dots, with dithered shading.
   dither: `float bayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
@@ -153,7 +211,7 @@ function program(kind) {
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return (programs[kind] = null);
   const u = {};
-  for (const name of ["u_res", "u_px", "u_time", "u_mouse", "u_on", "u_growX", "u_off", "u_onc", "u_accent"]) u[name] = gl.getUniformLocation(prog, name);
+  for (const name of ["u_res", "u_px", "u_time", "u_mouse", "u_on", "u_growX", "u_off", "u_onc", "u_accent", "u_thumbX", "u_thumbR"]) u[name] = gl.getUniformLocation(prog, name);
   return (programs[kind] = { prog, u, a: gl.getAttribLocation(prog, "a") });
 }
 
@@ -188,7 +246,7 @@ function draw(L, time, now) {
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.enableVertexAttribArray(p.a);
   gl.vertexAttribPointer(p.a, 2, gl.FLOAT, false, 0, 0);
-  const { on, growX } = P.getFill();
+  const { on, growX, thumbX = 0.5, thumbR = 0.4 } = P.getFill();
   const [off, onc, acc] = P.colors;
   gl.uniform2f(p.u.u_res, w, h);
   gl.uniform1f(p.u.u_px, P.px);
@@ -199,6 +257,8 @@ function draw(L, time, now) {
   gl.uniform4f(p.u.u_off, off.r, off.g, off.b, off.a);
   gl.uniform4f(p.u.u_onc, onc.r, onc.g, onc.b, onc.a);
   gl.uniform3f(p.u.u_accent, acc.r, acc.g, acc.b);
+  gl.uniform1f(p.u.u_thumbX, thumbX);
+  gl.uniform1f(p.u.u_thumbR, thumbR);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   ctx.clearRect(0, 0, w, h);
   // The viewport is the bottom-left w×h of the GL canvas, which is its last h rows as an image.

@@ -88,6 +88,16 @@ export function switchSvg(v, checked = true, frame = {}) {
     defs.push(`<linearGradient id="${id}-au" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${E.color}" stop-opacity="0"/><stop offset=".45" stop-color="${E.color}"/><stop offset=".7" stop-color="${T.onColor}"/><stop offset="1" stop-color="${E.color}" stop-opacity="0"/></linearGradient>`);
     body.push(trackRect(`fill="url(#${id}-au)" opacity="${r(0.3 + 0.5 * f)}"`));
   }
+  if (E.finish === "sky") {
+    // Day: clouds along the bottom. Night: a scatter of stars.
+    if (f < 0.5) {
+      const puffs = [[0.12, 0.95, 0.24], [0.3, 0.88, 0.3], [0.52, 0.97, 0.26], [0.74, 0.86, 0.32], [0.93, 0.95, 0.24]];
+      body.push(`<g fill="#fff" opacity=".92">${puffs.map(([x, y, rr]) => `<circle cx="${r(tx + x * W)}" cy="${r(ty + y * HT)}" r="${r(rr * HT)}"/>`).join("")}</g>`);
+    } else {
+      const stars = [[0.1, 0.25, 1], [0.22, 0.6, 0.7], [0.34, 0.2, 0.8], [0.45, 0.72, 0.6], [0.58, 0.3, 1], [0.7, 0.62, 0.7], [0.82, 0.22, 0.6], [0.9, 0.7, 0.9]];
+      body.push(`<g fill="#fff">${stars.map(([x, y, s]) => `<circle cx="${r(tx + x * W)}" cy="${r(ty + y * HT)}" r="${r(Math.max(0.6, HT * 0.025 * s))}"/>`).join("")}</g>`);
+    }
+  }
   if (E.finish === "grain") {
     defs.push(`<filter id="${id}-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>`);
     body.push(trackRect(`filter="url(#${id}-grain)" opacity=".22"`));
@@ -136,6 +146,10 @@ export function switchSvg(v, checked = true, frame = {}) {
   if (f > 0 && f < 1) layers.push(thumbRect(`fill="${H.onColor}" opacity="${r(f)}"`));
   if (E.finish === "holographic") layers.push(thumbRect(`fill="url(#${id}-holo)" opacity=".45"`));
   if (E.finish === "chrome") layers.push(thumbRect(`fill="url(#${id}-chrome)" opacity=".55"`));
+  if (E.finish === "sky" && on) {
+    const k = size / 24;
+    layers.push(`<g fill="#000" fill-opacity=".1">${[[0.32, 0.34, 2.6], [0.63, 0.58, 3.6], [0.42, 0.78, 1.7], [0.7, 0.26, 1.4]].map(([x, y, rr]) => `<circle cx="${r(thx + x * tw)}" cy="${r(thy + y * size)}" r="${r(rr * k)}"/>`).join("")}</g>`);
+  }
   if (H.gloss > 0) {
     defs.push(`<radialGradient id="${id}-gloss" cx=".35" cy=".18" r=".7"><stop offset="0" stop-color="#fff" stop-opacity="${r(0.95 * H.gloss)}"/><stop offset=".78" stop-color="#fff" stop-opacity="0"/></radialGradient>`);
     layers.push(thumbRect(`fill="url(#${id}-gloss)"`));

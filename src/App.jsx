@@ -11,8 +11,18 @@ import { MOD } from "./keys.js";
 import { a11yChecks, summarize, SURFACES } from "./a11y.js";
 import { ChecksTable, summaryText } from "./A11yChecks.jsx";
 import { MoodPanel } from "./Mood.jsx";
+import { Brand } from "./Brand.jsx";
 import { applyMood, CENTER } from "./mood.js";
 import { sanitize, STAGES, encodeShare, decodeShare, shareUrl, readShareHash } from "./share.js";
+
+// Toggle Preview (showreel, gallery, switch wall), loaded on first visit.
+const Preview = lazy(() => import("./preview/Preview.jsx"));
+const PREVIEW_MODES = ["showreel", "gallery", "wall"];
+// The view lives in the URL hash: "#preview", "#preview=gallery", "#preview=wall".
+function readView() {
+  const m = location.hash.match(/^#preview(?:=(\w+))?$/);
+  return m ? { mode: "preview", sub: PREVIEW_MODES.includes(m[1]) ? m[1] : "showreel" } : { mode: "lab", sub: "showreel" };
+}
 
 // Loaded on first visit to the Documentation view.
 const Docs = lazy(() => import("./Docs.jsx").then((m) => ({ default: m.Docs })));
@@ -130,6 +140,20 @@ export default function App() {
   const [locks, setLocks] = useStored("locks", { style: false, color: false, shape: false });
   const [recentRaw, setRecent] = useStored("recent", []);
   const [toast, setToast] = useState(null);
+  const [view, setView] = useState(readView);
+  useEffect(() => {
+    const sync = () => setView(readView());
+    window.addEventListener("popstate", sync);
+    window.addEventListener("hashchange", sync);
+    return () => { window.removeEventListener("popstate", sync); window.removeEventListener("hashchange", sync); };
+  }, []);
+  // Back and forward move between Lab and Preview; switching Preview tabs replaces the entry.
+  const go = useCallback((mode, sub = "showreel", replace = false) => {
+    const url = mode === "lab" ? location.pathname + location.search : `#preview${sub === "showreel" ? "" : `=${sub}`}`;
+    history[replace ? "replaceState" : "pushState"](null, "", url);
+    setView({ mode, sub });
+    window.scrollTo(0, 0);
+  }, []);
   const toastTimer = useRef(0);
   const prevScene = useRef("canvas");
 
@@ -355,7 +379,7 @@ export default function App() {
 
   // Latest handlers for listeners registered once.
   const actions = useRef({});
-  actions.current = { applyValues, showToast, undo, redo, randomize, toggleDocs, codeOpen };
+  actions.current = { applyValues, showToast, undo, redo, randomize, toggleDocs, codeOpen, mode: view.mode };
 
   // Open a shared link: on load, and when a link is pasted into this tab's address bar.
   useEffect(() => {
@@ -378,7 +402,7 @@ export default function App() {
     const onKey = (e) => {
       if (e.defaultPrevented || e.isComposing || (e.repeat && e.key.toLowerCase() !== "z")) return;
       const a = actions.current;
-      if (a.codeOpen) return;
+      if (a.codeOpen || a.mode !== "lab") return;
       if (e.target.closest?.('input, textarea, select, [contenteditable="true"], [role="listbox"], [role="dialog"]')) return;
       const k = e.key.toLowerCase();
       const mod = e.metaKey || e.ctrlKey;
@@ -409,22 +433,38 @@ export default function App() {
   const SceneComp = sceneDef.Comp;
   const ctx = { v, slow, zoom: isCanvas ? zoom : 1, checked, setChecked, trace };
 
+  const brand = <Brand mode={view.mode} onMode={(m) => go(m)} logoOn={logoOn} onLogo={() => setLogoOn((o) => !o)} />;
+
+  if (view.mode === "preview") {
+    return (
+      <>
+        <Suspense fallback={<div className="pv" />}>
+          <Preview
+            brand={brand}
+            sub={view.sub}
+            onSub={(sub) => go("preview", sub, true)}
+            onOpen={(values, stage) => { applyValues(values, stage); go("lab"); showToast("Opened in Lab"); }}
+            v={v}
+            stage={bg}
+          />
+        </Suspense>
+        <div className="toast-region" role="status" aria-live="polite">
+          <AnimatePresence>
+            {toast && (
+              <motion.div key={toast.id} className="toast" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}>
+                {toast.msg}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">
-          <button
-            type="button"
-            className="brand-mark"
-            role="switch"
-            aria-checked={logoOn}
-            aria-label="Toggle Lab logo"
-            onClick={() => setLogoOn((o) => !o)}
-          >
-            <span />
-          </button>
-          <span className="brand-name">Toggle Lab</span>
-        </div>
+        {brand}
         <div className="topbar-actions">
           <a className="link" href="https://github.com/strykowski/toggle-lab#readme" target="_blank" rel="noreferrer" aria-label="GitHub: docs and source">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
@@ -435,7 +475,7 @@ export default function App() {
               <path d="M4.5 2.5h5v5M9.5 2.5L3 9" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </a>
-          <button type="button" className="btn btn-secondary" onClick={() => applyStyle(PRESETS[0])}>
+          <button type="button" className="btn btn-secondary btn-reset" onClick={() => applyStyle(PRESETS[0])}>
             Reset
           </button>
           <button type="button" className="btn btn-secondary btn-icon btn-share" onClick={share} aria-label="Copy a share link">
