@@ -10,6 +10,8 @@ import { CodeDrawer } from "./CodeDrawer.jsx";
 import { MOD } from "./keys.js";
 import { a11yChecks, summarize, SURFACES } from "./a11y.js";
 import { ChecksTable, summaryText } from "./A11yChecks.jsx";
+import { MoodPanel } from "./Mood.jsx";
+import { applyMood, CENTER } from "./mood.js";
 import { sanitize, STAGES, encodeShare, decodeShare, shareUrl, readShareHash } from "./share.js";
 
 // Loaded on first visit to the Documentation view.
@@ -319,6 +321,33 @@ export default function App() {
     }
   };
 
+  // ---- Mood sliders ----
+  // Relative to the design they started from (the anchor). Any other change (a preset,
+  // Randomize, undo, a panel edit) makes that the new starting point and recenters them.
+  const [moods, setMoods] = useState(CENTER);
+  const moodAnchor = useRef(null);
+  const moodApplied = useRef([]); // fingerprints our own mood edits produced
+  useEffect(() => {
+    if (!moodAnchor.current || moodApplied.current.includes(fp)) return;
+    moodAnchor.current = null;
+    moodApplied.current = [];
+    setMoods(CENTER);
+  }, [fp]);
+  const changeMood = (id, x) => {
+    moodAnchor.current ??= v;
+    const next = { ...moods, [id]: x };
+    const values = applyMood(moodAnchor.current, next);
+    moodApplied.current = [...moodApplied.current.slice(-8), fingerprint(values)];
+    setMoods(next);
+    applyValues(values, null, { animate: false });
+  };
+  const centerMoods = () => {
+    if (!moodAnchor.current) return;
+    moodApplied.current = [...moodApplied.current.slice(-8), fingerprint(moodAnchor.current)];
+    setMoods(CENTER);
+    applyValues(moodAnchor.current, null, { animate: false });
+  };
+
   const toggleDocs = () => {
     if (scene === "docs") setScene(prevScene.current === "docs" ? "canvas" : prevScene.current);
     else { prevScene.current = scene; setScene("docs"); }
@@ -520,7 +549,7 @@ export default function App() {
             <p className="stage-hint">
               {reduceMotion
                 ? "Reduced motion is on, so trail, bursts, and squash are paused."
-                : "Click, drag, or press Space on the switch."}
+                : "Click, drag, flick, or press Space on the switch."}
             </p>
           </div>}
         </section>
@@ -544,6 +573,7 @@ export default function App() {
           currentFp={fp}
           onRecent={(e) => applyValues(e.values, e.stage)}
         />
+        <MoodPanel moods={moods} onChange={changeMood} onRelease={replay} onCenter={() => { centerMoods(); replay(); }} />
         <DialRoot mode="inline" theme="light" productionEnabled />
       </aside>
 

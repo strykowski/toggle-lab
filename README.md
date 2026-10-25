@@ -11,7 +11,9 @@ A playground for designing switch components. Shape it, color it, tune its motio
 ## What it does
 
 - **Tune everything live.** Around 50 controls in a [DialKit](https://github.com/joshpuckett/dialkit) panel: track and thumb geometry, colors, borders, depth, springs and easing curves, squash and stretch, glow, trails, bursts, surface finishes, 3D tilt and stepped motion.
-- **Start from presets.** 21 styles, from familiar (Cupertino, Material, Brutal) to experimental (FUI, Holographic, Lightsaber, Pixel, Plasma). Color and shape presets apply on their own, so you can mix them with any style, or hit **Randomize**.
+- **Start from presets.** 26 styles, from familiar (Cupertino, Material, Brutal) to experimental (FUI, Holographic, Lightsaber, Pixel, Plasma) and live WebGL shader finishes (Foil, Mercury, Borealis, Film, 1-bit). Color and shape presets apply on their own, so you can mix them with any style, or hit **Randomize**.
+- **Set the mood.** Four macro sliders, Soft ↔ Sharp, Calm ↔ Energetic, Flat ↔ Deep and Serious ↔ Playful, each move a whole set of controls at once.
+- **Throw it.** Flick the thumb: release speed decides the side, and the momentum carries into the spring.
 - **Explore freely.** Hit **Randomize** (or press **R**) for a new mix, lock style, color or shape to keep them, and click back through recent results. Every change can be undone with **⌘Z** / **Ctrl+Z**.
 - **Share it.** **Share** copies a link that opens your exact switch for anyone, no account needed.
 - **See it in context.** Swap the plain canvas for real scenes: a phone settings screen, a dashboard, a pricing page where the toggle flips the prices, a sign-in form, a site navbar with a working theme switch, a smart-home panel and a sci-fi cockpit.
@@ -65,7 +67,9 @@ src/
   CodeDrawer.jsx   Export drawer: code, image and Figma tabs
   figma.js         "Copy to Figma": the switch or the whole docs page as one SVG frame
   a11y.js          WCAG contrast and target-size checks (A11yChecks.jsx renders them)
-  color.js         Hex parsing, alpha compositing, contrast ratio, hover tint
+  color.js         Hex parsing, alpha compositing, contrast ratio, hover tint, saturation
+  mood.js          Mood slider mappings (Mood.jsx is the panel)
+  shaders.js       WebGL shader finishes on one shared context (ShaderLayer.jsx draws a layer)
   share.js         Share links, and sanitizing any values from outside (links, storage)
   keys.js          ⌘ / Ctrl shortcut labels
   codegen.js       HTML + CSS and React code generators

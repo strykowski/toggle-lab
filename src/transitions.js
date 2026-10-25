@@ -58,3 +58,14 @@ export function motionSource(t) {
     return `{ type: "spring", stiffness: ${r(m.stiffness, 1)}, damping: ${r(m.damping, 2)}, mass: ${r(m.mass, 2)} }`;
   return `{ duration: ${r(m.duration)}, ease: [${m.ease.map((x) => r(x)).join(", ")}] }`;
 }
+
+// The same spring in stiffness/damping form. Motion ignores inherited velocity on
+// duration-based springs (sensible when an animation is interrupted), so a deliberate
+// flick uses this form to carry its momentum. Matches Motion's own conversion for bounce ≥ 0.
+export function physicsSpring(t) {
+  if (t?.type !== "spring" || t.visualDuration == null) return t;
+  const ratio = Math.max(1 - (t.bounce ?? 0), 0.05);
+  const root = (2 * Math.PI) / (t.visualDuration * 1.2);
+  const stiffness = root * root;
+  return { type: "spring", stiffness, damping: 2 * ratio * Math.sqrt(stiffness), mass: 1 };
+}

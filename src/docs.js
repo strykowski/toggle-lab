@@ -1,3 +1,4 @@
+import { isShaderFinish } from "./shaders.js";
 import { spring, cubicBezier } from "motion";
 import { switchSvg, svgDataUrl } from "./svgExport.js";
 import { toMotion, settleMs } from "./transitions.js";
@@ -133,6 +134,7 @@ export function liveOnly(v) {
     M.tilt > 0 && `${M.tilt}° tilt`,
     E.trail > 0 && `trail ×${E.trail}`,
     E.burst !== "none" && `${E.burst} burst`,
+    isShaderFinish(E.finish) && `animated ${E.finish.replace("-", " ")} shader`,
   ].filter(Boolean);
 }
 

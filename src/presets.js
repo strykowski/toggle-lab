@@ -104,6 +104,11 @@ export const CONFIG = {
         { value: "chrome", label: "Chrome" },
         { value: "scanlines", label: "Scanlines" },
         { value: "plasma", label: "Plasma" },
+        { value: "iridescent", label: "Iridescent (shader)" },
+        { value: "liquid-metal", label: "Liquid metal (shader)" },
+        { value: "aurora", label: "Aurora (shader)" },
+        { value: "grain", label: "Film grain (shader)" },
+        { value: "dither", label: "1-bit dither (shader)" },
       ],
       default: "none",
     },
@@ -337,6 +342,41 @@ export const PRESETS = [
       squash: 0, steps: 3,
     },
     Effects: { color: "#00f0ff", finish: "scanlines", burst: "glitch", trail: 3 },
+  }),
+  // ---------- Shader finishes (live WebGL) ----------
+  wild("foil", "Foil", "ink", {
+    Track: { width: 64, height: 34, padding: 3, offColor: "#2a2b33", onColor: "#c9c3ff" },
+    Thumb: { size: 28, offColor: "#e8e8ee", onColor: "#ffffff", shadow: 0.5, gloss: 0.6, pressStretch: 1.2 },
+    Motion: { thumb: { type: "spring", visualDuration: 0.4, bounce: 0.3 }, squash: 0.15 },
+    Effects: { color: "#c4b5fd", finish: "iridescent", glow: 12 },
+  }),
+  wild("mercury", "Mercury", "mist", {
+    Track: { width: 72, height: 36, padding: 4, offColor: "#3a3f47", onColor: "#d9dee6", inset: 0.4 },
+    Thumb: { size: 28, offColor: "#c7ccd4", onColor: "#f4f6f9", shadow: 0.8, gloss: 0.9, pressStretch: 1.35 },
+    Motion: { thumb: { type: "spring", visualDuration: 0.5, bounce: 0.35 }, squash: 0.3 },
+    Effects: { color: "#e5e7eb", finish: "liquid-metal" },
+  }),
+  wild("borealis", "Borealis", "ink", {
+    Track: { width: 76, height: 36, padding: 4, offColor: "#0b1026", onColor: "#0f2a3d" },
+    Thumb: { size: 28, offColor: "#9aa4c7", onColor: "#e6fffb", shadow: 0.4, gloss: 0.4, pressStretch: 1.2 },
+    Motion: { thumb: { type: "spring", visualDuration: 0.55, bounce: 0.2 }, squash: 0.1 },
+    Effects: { color: "#5eead4", finish: "aurora", glow: 20 },
+  }),
+  wild("film", "Film", "paper", {
+    Track: { width: 56, height: 30, padding: 3, offColor: "#d6d0c4", onColor: "#c2410c" },
+    Thumb: { size: 24, offColor: "#f5f0e6", onColor: "#fff7ed", shadow: 0.45, pressStretch: 1.15 },
+    Motion: { thumb: { type: "spring", visualDuration: 0.35, bounce: 0.1 }, squash: 0.05 },
+    Effects: { color: "#c2410c", finish: "grain" },
+  }),
+  wild("onebit", "1-bit", "paper", {
+    Track: { width: 64, height: 32, roundness: 0, padding: 4, offColor: "#e5e5e5", onColor: "#111111", borderWidth: 2, borderColor: "#111111" },
+    Thumb: { size: 24, roundness: 0, offColor: "#111111", onColor: "#ffffff", shadow: 0, pressStretch: 1 },
+    Motion: {
+      thumb: { type: "easing", duration: 0.24, ease: [0.77, 0, 0.175, 1] },
+      fill: { type: "easing", duration: 0.32, ease: [0.4, 0, 0.2, 1] },
+      pressScale: 0.96, squash: 0,
+    },
+    Effects: { color: "#111111", finish: "dither" },
   }),
 ];
 

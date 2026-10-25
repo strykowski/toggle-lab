@@ -75,6 +75,27 @@ export function switchSvg(v, checked = true, frame = {}) {
     defs.push(`<pattern id="${id}-scan" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="1" fill="#fff" fill-opacity=".1"/><rect y="1" width="3" height="1" fill="#000" fill-opacity=".18"/></pattern>`);
     body.push(trackRect(`fill="url(#${id}-scan)"`));
   }
+  // Shader finishes are live (WebGL) only; still frames get a static approximation.
+  if (E.finish === "iridescent") {
+    defs.push(`<linearGradient id="${id}-iri" x1="0" y1="0" x2="1" y2=".6"><stop offset="0" stop-color="#ffc6f0"/><stop offset=".3" stop-color="#c7f0ff"/><stop offset=".55" stop-color="#dcffc8"/><stop offset=".8" stop-color="#fff1b8"/><stop offset="1" stop-color="#ffc6f0"/></linearGradient>`);
+    body.push(trackRect(`fill="url(#${id}-iri)" opacity="${r(0.45 + 0.15 * f)}"`));
+  }
+  if (E.finish === "liquid-metal") {
+    defs.push(`<linearGradient id="${id}-lm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f6f8"/><stop offset=".38" stop-color="#9aa1ab"/><stop offset=".5" stop-color="#2b2f36"/><stop offset=".64" stop-color="#c9ced6"/><stop offset="1" stop-color="#ffffff"/></linearGradient>`);
+    body.push(trackRect(`fill="url(#${id}-lm)" opacity=".85"`));
+  }
+  if (E.finish === "aurora") {
+    defs.push(`<linearGradient id="${id}-au" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${E.color}" stop-opacity="0"/><stop offset=".45" stop-color="${E.color}"/><stop offset=".7" stop-color="${T.onColor}"/><stop offset="1" stop-color="${E.color}" stop-opacity="0"/></linearGradient>`);
+    body.push(trackRect(`fill="url(#${id}-au)" opacity="${r(0.3 + 0.5 * f)}"`));
+  }
+  if (E.finish === "grain") {
+    defs.push(`<filter id="${id}-grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>`);
+    body.push(trackRect(`filter="url(#${id}-grain)" opacity=".22"`));
+  }
+  if (E.finish === "dither") {
+    defs.push(`<pattern id="${id}-dith" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="1" height="1" fill="#000" fill-opacity=".22"/><rect x="2" y="2" width="1" height="1" fill="#000" fill-opacity=".22"/></pattern>`);
+    body.push(`<rect x="${tx}" y="${r(ty + HT * 0.55)}" width="${W}" height="${r(HT * 0.45)}" fill="url(#${id}-dith)"/>`);
+  }
   if (T.sheen > 0) {
     defs.push(`<linearGradient id="${id}-sheen" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="${r(0.6 * T.sheen)}"/><stop offset=".48" stop-color="#fff" stop-opacity="${r(0.12 * T.sheen)}"/><stop offset=".52" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="${r(0.06 * T.sheen)}"/></linearGradient>`);
     body.push(trackRect(`fill="url(#${id}-sheen)"`));

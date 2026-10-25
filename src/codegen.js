@@ -1,6 +1,7 @@
 import { toCss, motionSource } from "./transitions.js";
 import { GLYPHS } from "./glyphs.jsx";
 import { hoverTint } from "./color.js";
+import { isShaderFinish } from "./shaders.js";
 
 const r = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 const px = (n) => `${r(n)}px`;
@@ -52,6 +53,7 @@ function missing(v, target) {
   if (E.burst !== "none") out.push(`${E.burst} burst`);
   if (M.pop > 0) out.push("track pop");
   if (M.steps > 0) out.push("stepped motion");
+  if (isShaderFinish(E.finish)) out.push(`${E.finish.replace("-", " ")} shader finish (WebGL)`);
   return out;
 }
 

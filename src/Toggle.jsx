@@ -8,9 +8,11 @@ import {
   useAnimationFrame,
   useReducedMotion,
 } from "motion/react";
-import { toMotion, scaleTime } from "./transitions.js";
+import { toMotion, scaleTime, physicsSpring } from "./transitions.js";
 import { Glyph } from "./glyphs.jsx";
 import { hoverTint } from "./color.js";
+import { ShaderLayer } from "./ShaderLayer.jsx";
+import { isShaderFinish } from "./shaders.js";
 
 const mix = (c, a) => `color-mix(in srgb, ${c} ${Math.round(Math.max(0, Math.min(1, a)) * 100)}%, transparent)`;
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
@@ -37,6 +39,7 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   const [hovered, setHovered] = useState(false);
   const [settle, setSettle] = useState(0);
   const drag = useRef(null);
+  const flickVel = useRef(null); // release velocity (px/s) handed to the next thumb spring
   const suppressClick = useRef(false);
 
   const size = checked ? S : sOff;
@@ -53,6 +56,7 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
   const h = useMotionValue(size);
   const rad = useMotionValue(rThumb);
   const hoverS = useMotionValue(1);
+  const fillP = useMotionValue(checked ? 1 : 0); // fill progress, read by shader finishes
   const popX = useMotionValue(1);
   const popY = useMotionValue(1);
   const y = useTransform(() => -h.get() / 2);
@@ -109,7 +113,17 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
       return;
     }
     if (drag.current?.dragging) return;
-    animate(cx, restC, thumbT);
+    // A flick hands part of its release velocity to the spring, so the thumb carries
+    // momentum into the end and overshoots more the harder it was thrown. Capped so a
+    // hard throw lands with a thunk instead of flying off the track.
+    const v0 = flickVel.current;
+    flickVel.current = null;
+    let thumbMove = thumbT;
+    if (v0 != null && thumbT.type === "spring") {
+      const cap = Math.max(1, Math.abs(onC - offC)) * 8;
+      thumbMove = { ...physicsSpring(thumbT), velocity: Math.max(-cap, Math.min(cap, v0 * 0.4)) };
+    }
+    animate(cx, restC, thumbMove);
     animate(w, tw, thumbT);
     animate(h, size, thumbT);
     animate(rad, rThumb, thumbT);
@@ -187,27 +201,42 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checked]);
 
+  useEffect(() => {
+    if (preview) { fillP.set(checked ? 1 : 0); return; }
+    animate(fillP, checked ? 1 : 0, fillT);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checked, preview]);
+  const getFill = () => (T.fillMode === "grow"
+    ? { on: growO.get(), growX: W > 0 ? growW.get() / W : 0 }
+    : { on: fillP.get(), growX: -1 });
+
   // ---- pointer: press-stretch, drag to toggle ----
   const onPointerEnter = (e) => { if (!preview && e.pointerType === "mouse") setHovered(true); };
   const onPointerLeave = () => setHovered(false);
   const onPointerDown = (e) => {
     if (preview || e.button !== 0) return;
     setPressed(true);
-    drag.current = { x0: e.clientX, c0: cx.get(), dragging: false };
+    drag.current = { x0: e.clientX, c0: cx.get(), dragging: false, samples: [{ t: performance.now(), c: cx.get() }] };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e) => {
     const d = drag.current;
     if (!d) return;
     const dx = (e.clientX - d.x0) / zoom;
+    // Velocity samples start at pointer-down, so a short, fast flick still registers.
+    const t = performance.now();
+    d.samples.push({ t, c: d.c0 + dx });
+    while (d.samples.length > 2 && t - d.samples[0].t > 100) d.samples.shift();
     if (!d.dragging && Math.abs(dx) > 3) d.dragging = true;
     if (d.dragging) {
       cx.stop();
       const lo = offC + (tw - size) / 2;
       const hi = onC - (tw - size) / 2;
       let next = d.c0 + dx;
-      if (next < lo) next = lo - (lo - next) * 0.2;
-      if (next > hi) next = hi + (next - hi) * 0.2;
+      // Progressive rubber band past the ends: the further you pull, the stiffer it gets.
+      const band = (over) => { const r = Math.max(4, HT * 0.6); return r * (1 - 1 / (over / r * 0.55 + 1)); };
+      if (next < lo) next = lo - band(lo - next);
+      if (next > hi) next = hi + band(next - hi);
       cx.set(next);
     }
   };
@@ -217,7 +246,14 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
     setPressed(false);
     if (d?.dragging) {
       suppressClick.current = true;
-      const next = cx.get() > (offC + onC) / 2;
+      // Flick: velocity over the last ~100 ms, projected a little ahead, picks the side.
+      const sm = d.samples;
+      const dt = sm.length > 1 ? sm[sm.length - 1].t - sm[0].t : 0;
+      const stale = sm.length && performance.now() - sm[sm.length - 1].t > 80; // stopped before letting go
+      const vel = dt > 0 && !stale ? ((sm[sm.length - 1].c - sm[0].c) / dt) * 1000 : 0; // px/s
+      const projected = cx.get() + vel * 0.12;
+      const next = projected > (offC + onC) / 2;
+      flickVel.current = vel / slow;
       if (commit && next !== checked) onToggle?.(next);
       else setSettle((s) => s + 1);
     }
@@ -307,6 +343,9 @@ export function Toggle({ v, checked, onToggle, preview = false, slow = 1, zoom =
               animate={{ opacity: checked ? 1 : 0 }}
               transition={fillT}
             />
+          )}
+          {isShaderFinish(E.finish) && (
+            <ShaderLayer kind={E.finish} off={T.offColor} on={T.onColor} accent={E.color} width={W} height={HT} zoom={zoom} getFill={getFill} />
           )}
           {E.finish === "plasma" && (
             <motion.span

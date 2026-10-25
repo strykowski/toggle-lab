@@ -309,6 +309,30 @@ button { font: inherit; color: inherit; }
 .recent-item[aria-current="true"] .select-preview { box-shadow: 0 0 0 1.5px var(--text); }
 @media (hover: hover) and (pointer: fine) { .recent-item:hover .select-preview { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2); } }
 
+/* ---------- mood sliders ---------- */
+.mood-panel { padding: 14px 16px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.text-btn { padding: 2px 6px; border: 0; border-radius: 5px; background: none; color: var(--muted); font-size: 12px; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .text-btn:hover { color: var(--text); background: var(--surface-2); } }
+.mood-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) 62px; align-items: center; gap: 8px; }
+.mood-end { font-size: 12px; color: var(--faint); transition: color 150ms ease; }
+.mood-end:last-child { text-align: right; }
+.mood-end.is-on { color: var(--text); }
+.mood-range {
+  --track: linear-gradient(90deg, transparent var(--from), var(--text) var(--from) var(--to), transparent var(--to)), linear-gradient(90deg, transparent calc(50% - 0.5px), #bdbdbd calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)), var(--surface-2);
+  appearance: none; -webkit-appearance: none; width: 100%; height: 20px; margin: 0; background: none; cursor: pointer;
+}
+.mood-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--track); }
+.mood-range::-moz-range-track { height: 4px; border-radius: 2px; background: var(--track); }
+.mood-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.18); transition: scale 120ms var(--ease-out);
+}
+.mood-range::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.18); }
+.mood-range:active::-webkit-slider-thumb { scale: 1.15; }
+.mood-range:focus-visible { box-shadow: none; }
+.mood-range:focus-visible::-webkit-slider-thumb { box-shadow: var(--ring); }
+.mood-range:focus-visible::-moz-range-thumb { box-shadow: var(--ring); }
+
 /* ---------- accessibility checks ---------- */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .a11y-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -602,6 +626,7 @@ button { font: inherit; color: inherit; }
 .tg-body { position: absolute; inset: 0; display: block; }
 .tg-clip { position: absolute; inset: 0; overflow: hidden; display: block; }
 .tg-layer { position: absolute; inset: 0; display: block; border-radius: inherit; pointer-events: none; }
+.tg-shader { width: 100%; height: 100%; } /* a canvas keeps its pixel size unless told otherwise */
 .tg-thumb {
   position: absolute;
   left: 0;
